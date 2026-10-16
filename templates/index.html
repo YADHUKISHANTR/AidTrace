@@ -1,0 +1,259 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AidTrace — Relief Investigation</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+    <script
+        src="{{ url_for('static', filename='script.js') }}"
+        defer
+    ></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="/" aria-label="AidTrace home">
+                <span class="brand-mark">AT</span>
+                <span>AidTrace</span>
+            </a>
+
+            <span class="header-label">RELIEF INVESTIGATION</span>
+        </div>
+    </header>
+
+    <main class="page">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">INVESTIGATIONS / OVERVIEW</p>
+                <h1>Investigation overview</h1>
+                <p class="page-description">
+                    Review relief records, trace evidence, and identify
+                    gaps that require further verification.
+                </p>
+            </div>
+        </div>
+
+        {% if case %}
+        <section class="case-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">{{ case.request_id }}</p>
+                    <h2>{{ case.community }} — {{ case.item }}</h2>
+                </div>
+
+                <span class="status" id="case-status">
+                    <span class="status-dot"></span>
+                    Needs human review
+                </span>
+            </div>
+
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Quantity requested</span>
+                    <strong id="requested-quantity">{{ case.requested }}</strong>
+                    <span class="metric-unit">kits</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-label">Reported delivered</span>
+                    <strong id="reported-quantity">{{ case.reported }}</strong>
+                    <span class="metric-unit">kits</span>
+                </div>
+
+                <div class="metric">
+                    <span class="metric-label">Receipt confirmed</span>
+                    <strong id="confirmed-quantity">{{ case.confirmed }}</strong>
+                    <span class="metric-unit">kits</span>
+                </div>
+
+                <div class="metric discrepancy-metric">
+                    <span class="metric-label">Not yet confirmed</span>
+                    <strong id="unconfirmed-quantity">{{ case.gap }}</strong>
+                    <span class="metric-unit">kits</span>
+                </div>
+            </div>
+
+            <p class="notice" id="evidence-notice">
+                <strong>Evidence gap, not a conclusion.</strong>
+                The difference between the reported delivery and the
+                available receipt evidence needs further investigation.
+                It does not establish that supplies were lost or never delivered.
+            </p>
+        </section>
+
+        <section class="content-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">01 / RECORDS</p>
+                    <h2>Evidence trail</h2>
+                </div>
+                <span class="section-count">5 fields</span>
+            </div>
+
+            <div class="evidence-list">
+                <div class="evidence-row">
+                    <div class="evidence-index">01</div>
+                    <div class="evidence-content">
+                        <h3>Delivery record</h3>
+                        <p id="delivery-description">
+                            {{ case.reported }} kits reported as delivered.
+                        </p>
+                    </div>
+                    <span class="evidence-value" id="delivery-value">
+                        {{ case.reported }} kits
+                    </span>
+                </div>
+
+                <div class="evidence-row">
+                    <div class="evidence-index">02</div>
+                    <div class="evidence-content">
+                        <h3>Receipt record</h3>
+                        <p id="receipt-description">
+                            Quantity confirmed by the available receipt.
+                        </p>
+                    </div>
+                    <span class="evidence-value" id="receipt-value">
+                        {{ case.confirmed }} kits
+                    </span>
+                </div>
+
+                <div class="evidence-row">
+                    <div class="evidence-index">03</div>
+                    <div class="evidence-content">
+                        <h3>Transport route</h3>
+                        <p id="route-name">
+                            {{ case.route or "No connected route found" }}
+                        </p>
+                    </div>
+                    <span class="tag" id="route-status">
+                        {{ case.route_status or "Unknown" }}
+                    </span>
+                </div>
+
+                <div class="evidence-row">
+                    <div class="evidence-index">04</div>
+                    <div class="evidence-content">
+                        <h3>Incident report</h3>
+                        <p id="incident-description">
+                            {{ case.incident or "No connected incident report found." }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="evidence-row">
+                    <div class="evidence-index">05</div>
+                    <div class="evidence-content">
+                        <h3>Warehouse stock</h3>
+                        <p id="warehouse-name">
+                            {{ case.warehouse or "No connected warehouse found" }}
+                        </p>
+                    </div>
+                    <span class="evidence-value" id="warehouse-stock">
+                        {{ case.stock if case.stock is not none else "Unknown" }}{% if case.stock is not none %} kits{% endif %}
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">02 / FOLLOW-UP</p>
+                    <h2>Recommended next actions</h2>
+                </div>
+            </div>
+
+            <ol class="action-list" id="recommended-actions">
+                <li>
+                    <span class="action-number">1</span>
+                    <p>Request additional receipt or handover evidence.</p>
+                </li>
+                <li>
+                    <span class="action-number">2</span>
+                    <p>Ask the delivery organisation to reconcile the reported quantity.</p>
+                </li>
+                <li>
+                    <span class="action-number">3</span>
+                    <p>Check whether the route disruption affected this delivery.</p>
+                </li>
+                <li>
+                    <span class="action-number">4</span>
+                    <p>Verify whether recorded warehouse stock is available and unallocated.</p>
+                </li>
+            </ol>
+
+            <div class="investigation-controls">
+                <div>
+                    <h3>Recheck connected evidence</h3>
+                    <p>
+                        Query the current graph records and recalculate
+                        the discrepancy.
+                    </p>
+                </div>
+
+                <button id="run-investigation" type="button">
+                    Run investigation
+                    <span aria-hidden="true">→</span>
+                </button>
+            </div>
+
+            <div class="evidence-control">
+                <label for="route-status-select">
+                    North Access Road status
+                </label>
+
+                <select id="route-status-select">
+                    <option value="Disrupted"
+                        {% if case.route_status == "Disrupted" %}selected{% endif %}>
+                        Disrupted
+                    </option>
+                    <option value="Operational"
+                        {% if case.route_status == "Operational" %}selected{% endif %}>
+                        Operational
+                    </option>
+                </select>
+
+                <button id="update-route-button" type="button">
+                    Update route status
+                </button>
+
+                <p
+                    id="route-update-status"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+            </div>
+
+            <p
+                id="investigation-status"
+                class="investigation-status"
+                role="status"
+                aria-live="polite"
+            ></p>
+        </section>
+
+        {% else %}
+        <section class="empty-state">
+            <h2>No investigation found</h2>
+            <p>
+                No matching request, delivery, and receipt were found
+                in the connected graph.
+            </p>
+        </section>
+        {% endif %}
+
+        <footer class="page-footer">
+            <span>AidTrace</span>
+            <span>Evidence-led relief investigation</span>
+        </footer>
+    </main>
+</body>
+</html>
