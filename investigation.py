@@ -46,11 +46,17 @@ def get_investigation():
         incident_status, warehouse, stock
     ) = row
 
-    # Keep missing quantities from causing a calculation error.
     gap = (
         max(reported - confirmed, 0)
         if reported is not None and confirmed is not None
         else None
+    )
+
+    incident_is_simulated = bool(
+        incident and "SIMULATED" in incident.upper()
+    ) or (
+        incident_status is not None
+        and "simulated" in str(incident_status).lower()
     )
 
     evidence = [
@@ -64,7 +70,8 @@ def get_investigation():
         {
             "type": "delivery_record",
             "reference": delivery_id,
-            "reported_quantity": reported
+            "reported_quantity": reported,
+            "quantity_is_reported_not_independently_verified": True
         },
         {
             "type": "receipt",
@@ -84,10 +91,8 @@ def get_investigation():
             "type": "incident_report",
             "description": incident,
             "recorded_status": incident_status,
-            "simulated_demo_evidence": (
-                "SIMULATED" in incident.upper()
-                or incident_status == "Simulated"
-            )
+            "simulated_demo_evidence": incident_is_simulated,
+            "causal_link_verified": False
         })
 
     if warehouse or stock is not None:
@@ -95,7 +100,8 @@ def get_investigation():
             "type": "warehouse_stock",
             "warehouse": warehouse,
             "item": item,
-            "recorded_quantity": stock
+            "recorded_quantity": stock,
+            "physical_stock_verified": False
         })
 
     leads = []
@@ -115,10 +121,14 @@ def get_investigation():
     if route_status == "Disrupted":
         leads.append({
             "title": "Transport route requires review",
-            "finding": f"The recorded status of {route} is Disrupted.",
+            "finding": (
+                f"The recorded status of {route} is Disrupted. "
+                "Its effect on this delivery has not been established."
+            ),
             "status": "Unverified",
             "next_step": (
-                "Compare dispatch times, route records, and handover evidence."
+                "Verify the route status and compare delivery timestamps "
+                "with independently sourced transport records."
             )
         })
 
@@ -126,23 +136,25 @@ def get_investigation():
         leads.append({
             "title": "Recorded warehouse stock",
             "finding": (
-                f"{stock} {item} are recorded at {warehouse}."
+                f"{stock} {item} are recorded at {warehouse}; "
+                "physical availability is unverified."
             ),
             "status": "Unverified",
             "next_step": (
-                "Verify current stock, allocation, and availability."
+                "Verify current physical stock, allocation, and availability."
             )
         })
 
     recommended_actions = [
         "Request additional receipt or handover evidence.",
         "Ask the delivery organisation to reconcile the reported quantity.",
-        "Review dispatch records and delivery timestamps."
+        "Review original delivery records and timestamps."
     ]
 
     if route_status == "Disrupted":
         recommended_actions.append(
-            "Check whether the simulated route disruption affected this delivery."
+            "Verify the route status and its relevance using independent "
+            "records; do not assume it caused the discrepancy."
         )
 
     if stock is not None and stock > 0:
@@ -169,12 +181,13 @@ def get_investigation():
         "route_status": route_status,
         "incident": incident,
         "incident_status": incident_status,
+        "incident_is_simulated": incident_is_simulated,
         "warehouse": warehouse,
         "stock": stock,
         "status": "Needs human review",
         "assessment": (
             "An evidence gap is not proof of loss, theft, or non-delivery. "
-            "Findings require verification."
+            "Reported quantities and physical stock require verification."
         ),
         "evidence": evidence,
         "leads": leads,
