@@ -4,858 +4,1045 @@ const investigationStatus = document.getElementById("investigation-status");
 const routeSelect = document.getElementById("route-status-select");
 const updateRouteButton = document.getElementById("update-route-button");
 const routeUpdateStatus = document.getElementById("route-update-status");
-
 const runAIButton = document.getElementById("run-ai-investigation");
 const aiInvestigationStatus = document.getElementById("ai-investigation-status");
 const aiAnalysisContainer = document.getElementById("ai-analysis");
+const scenarioSelect = document.getElementById("scenario-select");
 
 let aiAnalysisNeedsRefresh = false;
 
-function updateText(id, value) {
-    const element = document.getElementById(id);
+function getSelectedScenario() {
+    return scenarioSelect?.value || new URLSearchParams(window.location.search).get("scenario_id") || "wayanad";
+}
 
+function updateText(id, value, fallback = "Not available") {
+    const element = document.getElementById(id);
     if (element) {
         element.textContent =
-            value === null || value === undefined || value === ""
-                ? "Unknown"
-                : value;
+            value !== undefined && value !== null && value !== ""
+                ? String(value)
+                : fallback;
     }
+}
+
+function formatValue(value) {
+    if (value === undefined || value === null || value === "") {
+        return "Not available";
+    }
+    if (typeof value === "object") {
+        return JSON.stringify(value, null, 2);
+    }
+    return String(value);
+}
+
+async function readResponse(response) {
+    let data;
+
+    try {
+        data = await response.json();
+    } catch {
+        throw new Error("The server returned an unreadable response.");
+    }
+
+    if (!response.ok) {
+        throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+    }
+
+    return data;
 }
 
 function renderActions(actions) {
-    const list = document.getElementById("recommended-actions");
+    const container = document.getElementById("recommended-actions");
+    if (!container) return;
 
-    if (!list) return;
+    container.replaceChildren();
 
-    list.replaceChildren();
-
-    actions.forEach((action, index) => {
-        const item = document.createElement("li");
-
-        const number = document.createElement("span");
-        number.className = "action-number";
-        number.textContent = index + 1;
-
-        const text = document.createElement("p");
-        text.textContent = action;
-
-        item.append(number, text);
-        list.appendChild(item);
-    });
-}
-
-// --------------------------------------------------
-// NEW: Cross-centre findings and action rendering
-// --------------------------------------------------
-
-function appendFindingDetail(container, label, value) {
-    if (value === null || value === undefined || value === "") {
+    if (!Array.isArray(actions) || actions.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "No recommended actions are available for this investigation.";
+        container.appendChild(message);
         return;
     }
 
-    const paragraph = document.createElement("p");
-    const strong = document.createElement("strong");
+    actions.forEach((action) => {
+        const item = document.createElement("div");
+        item.className = "action-item";
 
-    strong.textContent = `${label}: `;
-    paragraph.appendChild(strong);
-    paragraph.appendChild(document.createTextNode(String(value)));
+        const title = document.createElement("h4");
+        title.textContent = action.title || action.action || "Recommended action";
+        item.appendChild(title);
 
-    container.appendChild(paragraph);
+        const description = document.createElement("p");
+        description.textContent =
+            action.description || action.reason || action.details || "";
+        item.appendChild(description);
+
+        if (action.requires_human_review || action.automatically_authorized === false) {
+            const note = document.createElement("p");
+            note.className = "record-reference";
+            note.textContent = "Requires human review before action.";
+            item.appendChild(note);
+        }
+
+        container.appendChild(item);
+    });
 }
 
-function renderCrossCentreFindings(findings, actions) {
-    const findingsContainer =
-        document.getElementById("cross-centre-findings");
+function appendFindingDetail(container, label, value) {
+    const detail = document.createElement("p");
+    const strong = document.createElement("strong");
+    strong.textContent = `${label}: `;
+    detail.appendChild(strong);
+    detail.appendChild(document.createTextNode(formatValue(value)));
+    container.appendChild(detail);
+}
 
-    const actionsContainer =
-        document.getElementById("cross-centre-actions");
 
-    const section = document.getElementById("cross-centre-section");
+function renderCrossCentreFindings(findings) {
+    const container = document.getElementById("cross-centre-findings");
+    const actionsContainer = document.getElementById("cross-centre-actions");
 
-    if (!section) return;
+    if (!container) return;
 
-    const sectionCount = section.querySelector(".section-count");
+    container.replaceChildren();
+    if (actionsContainer) actionsContainer.replaceChildren();
 
-    if (sectionCount) {
-        sectionCount.textContent =
-            `${Array.isArray(findings) ? findings.length : 0} findings`;
+    if (!Array.isArray(findings) || findings.length === 0) {
+        const message = document.createElement("p");
+        message.textContent =
+            "No cross-centre findings were returned for this scenario.";
+        container.appendChild(message);
+        return;
     }
 
-    if (findingsContainer) {
-        findingsContainer.replaceChildren();
+    findings.forEach((finding) => {
+        const card = document.createElement("div");
+        card.className = "finding-card";
 
-        if (!Array.isArray(findings) || findings.length === 0) {
-            const empty = document.createElement("p");
-            empty.className = "investigation-status";
-            empty.textContent =
-                "No cross-centre discrepancy findings were returned by the current graph query.";
+        const title = document.createElement("h4");
+        title.textContent =
+            finding.title || finding.type || "Cross-centre finding";
+        card.appendChild(title);
 
-            findingsContainer.appendChild(empty);
-        } else {
-            findings.forEach((finding, index) => {
-                const article = document.createElement("article");
-                article.className = "evidence-row cross-centre-finding";
+        appendFindingDetail(
+            card,
+            "Description",
+            finding.finding ||
+            finding.description ||
+            finding.summary ||
+            "No finding description was provided."
+        );
 
-                const number = document.createElement("div");
-                number.className = "evidence-index";
-                number.textContent = String(index + 1).padStart(2, "0");
-
-                const content = document.createElement("div");
-                content.className = "evidence-content";
-
-                const heading = document.createElement("h3");
-                heading.textContent = finding.title || "Discrepancy finding";
-                content.appendChild(heading);
-
-                if (finding.centre) {
-                    appendFindingDetail(content, "Centre", finding.centre);
-                }
-
-                if (Array.isArray(finding.centres)) {
-                    appendFindingDetail(
-                        content,
-                        "Centres compared",
-                        finding.centres.join(" ↔ ")
-                    );
-                }
-
-                appendFindingDetail(content, "Item", finding.item);
-                appendFindingDetail(
-                    content,
-                    "Request reference",
-                    finding.request_id
-                );
-
-                if (finding.requested_quantity !== undefined) {
-                    appendFindingDetail(
-                        content,
-                        "Requested",
-                        finding.requested_quantity
-                    );
-                }
-
-                if (
-                    finding.reported_quantity !== undefined &&
-                    finding.reported_quantity !== null
-                ) {
-                    appendFindingDetail(
-                        content,
-                        "Reported delivered",
-                        finding.reported_quantity
-                    );
-                }
-
-                if (
-                    finding.confirmed_quantity !== undefined &&
-                    finding.confirmed_quantity !== null
-                ) {
-                    appendFindingDetail(
-                        content,
-                        "Receipt-confirmed",
-                        finding.confirmed_quantity
-                    );
-                }
-
-                appendFindingDetail(content, "Finding", finding.finding);
-                appendFindingDetail(
-                    content,
-                    "Verification step",
-                    finding.next_step
-                );
-
-                const status = document.createElement("span");
-                status.className = "tag";
-                status.textContent = finding.status || "Unverified";
-
-                article.append(number, content, status);
-                findingsContainer.appendChild(article);
-            });
+        if (finding.evidence) {
+            appendFindingDetail(card, "Evidence", finding.evidence);
         }
-    }
 
-    if (actionsContainer) {
-        actionsContainer.replaceChildren();
+        if (finding.uncertainty) {
+            appendFindingDetail(card, "Uncertainty", finding.uncertainty);
+        }
 
-        if (!Array.isArray(actions) || actions.length === 0) {
-            const empty = document.createElement("li");
-            empty.textContent = "No additional cross-centre actions.";
-            actionsContainer.appendChild(empty);
-        } else {
-            actions.forEach((action, index) => {
-                const item = document.createElement("li");
+        container.appendChild(card);
 
-                const number = document.createElement("span");
-                number.className = "action-number";
-                number.textContent = index + 1;
-
-                const text = document.createElement("p");
-                text.textContent = action;
-
-                item.append(number, text);
+        if (actionsContainer && Array.isArray(finding.recommended_actions)) {
+            finding.recommended_actions.forEach((action) => {
+                const item = document.createElement("p");
+                item.textContent = typeof action === "string"
+                    ? action
+                    : action.title ||
+                      action.description ||
+                      JSON.stringify(action);
                 actionsContainer.appendChild(item);
             });
         }
+    });
+}
+
+
+
+function renderResourceMatching(data) {
+    const matchesContainer = document.getElementById("resource-matches");
+    const unmatchedContainer = document.getElementById("unmatched-resource-demand");
+    const note = document.getElementById("resource-matching-note");
+
+    if (matchesContainer) matchesContainer.replaceChildren();
+    if (unmatchedContainer) unmatchedContainer.replaceChildren();
+
+    if (!data) {
+        if (note) note.textContent = "Resource-matching results are not available.";
+        return;
+    }
+
+    const matches = data.matches || data.resource_matches || [];
+    const unmatched = data.unmatched_demand || data.unmatched || [];
+
+    if (note) {
+        note.textContent = data.note || data.summary ||
+            "Potential matches use recorded stock only. Physical availability, existing commitments, and transfer authority are unverified. Matches are not allocations, and the same stock may appear for multiple centres.";
+    }
+
+    if (matchesContainer) {
+        if (!Array.isArray(matches) || matches.length === 0) {
+            const message = document.createElement("p");
+            message.textContent = "No matching recorded stock was found in this scenario.";
+            matchesContainer.appendChild(message);
+        } else {
+            matches.forEach((match) => {
+                const card = document.createElement("div");
+                card.className = "resource-match-card";
+
+                const title = document.createElement("h4");
+                title.textContent = `${match.centre || "Centre"} — ${match.item || "Resource"}`;
+                card.appendChild(title);
+
+                const warehouses = match.candidate_warehouses
+                    ?.map((entry) =>
+                        `${entry.warehouse}: ${entry.recorded_stock_quantity} recorded units (unverified)`
+                    )
+                    .join("; ");
+
+                appendFindingDetail(
+                    card,
+                    "Candidate warehouse(s)",
+                    warehouses || "No recorded candidate warehouses"
+                );
+
+                appendFindingDetail(
+                    card,
+                    "Recorded shortfall",
+                    match.recorded_shortfall
+                );
+
+                appendFindingDetail(
+                    card,
+                    "Potential match from recorded stock — not confirmed available",
+                    match.potential_match_quantity
+                );
+
+                appendFindingDetail(
+                    card,
+                    "Shortfall remaining after potential matching — not confirmed covered",
+                    match.remaining_unmatched_quantity
+                );
+
+                const caution = document.createElement("p");
+                caution.className = "record-reference";
+                caution.textContent =
+                    "This is a planning lead, not confirmed supply coverage. Verify physical stock, duplicate records, existing commitments, and transfer authority before considering allocation.";
+                card.appendChild(caution);
+
+                matchesContainer.appendChild(card);
+            });
+        }
+    }
+
+    if (unmatchedContainer) {
+        if (!Array.isArray(unmatched) || unmatched.length === 0) {
+            const message = document.createElement("p");
+            message.textContent =
+                "No additional unmatched quantity was returned by the matching calculation. This does not mean demand is fulfilled or that candidate stock is available.";
+            unmatchedContainer.appendChild(message);
+        } else {
+            unmatched.forEach((item) => {
+                const entry = document.createElement("p");
+                entry.textContent = typeof item === "string"
+                    ? item
+                    : `${item.item || item.resource || item.name || "Resource"}: ${formatValue(item.unmatched_quantity ?? item.shortfall ?? item.quantity ?? item)}`;
+                unmatchedContainer.appendChild(entry);
+            });
+        }
     }
 }
 
 
-function renderResourceMatching(result) {
-    const matchesContainer = document.getElementById("resource-matches");
-    const unmatchedContainer = document.getElementById("unmatched-resource-demand");
-    const note = document.getElementById("resource-matching-note");
-    const section = document.getElementById("resource-matching-section");
+function renderActionPlans(actionPlans) {
+    const section = document.getElementById("action-plans-section");
+    if (!section || !Array.isArray(actionPlans)) return;
 
-    if (!section) return;
-
-    if (note) {
-        note.textContent = result.resource_matching_note ||
-            "Resource matches are planning leads only. Verify stock, commitments, and transfer authority.";
+    let container = document.getElementById("action-plans-live");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "action-plans-live";
+        section.appendChild(container);
     }
 
-    const matches = Array.isArray(result.resource_matches)
-        ? result.resource_matches
-        : [];
+    container.replaceChildren();
 
-    const unmatched = Array.isArray(result.unmatched_demand)
-        ? result.unmatched_demand
-        : [];
-
-    const count = section.querySelector(".section-count");
-
-    if (count) {
-        count.textContent = `${matches.length} potential matches`;
+    if (actionPlans.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "No action plans are available for this investigation.";
+        container.appendChild(message);
+        return;
     }
 
-    if (matchesContainer) {
-        matchesContainer.replaceChildren();
+    actionPlans.forEach((plan) => {
+        const card = document.createElement("div");
+        card.className = "action-plan-card";
 
-        if (matches.length === 0) {
-            const empty = document.createElement("p");
-            empty.textContent = "No potential resource matches were returned.";
-            matchesContainer.appendChild(empty);
+        const title = document.createElement("h4");
+        title.textContent = plan.title || plan.action || "Suggested next step";
+        card.appendChild(title);
+
+        appendFindingDetail(card, "Reason", plan.reason || plan.description);
+        if (plan.supporting_evidence) {
+            appendFindingDetail(card, "Supporting evidence", plan.supporting_evidence);
+        }
+        if (plan.uncertainty) {
+            appendFindingDetail(card, "Uncertainty", plan.uncertainty);
         }
 
-        matches.forEach((match, index) => {
-            const article = document.createElement("article");
-            article.className = "evidence-row resource-match";
+        const review = document.createElement("p");
+        review.className = "record-reference";
+        review.textContent = "Human review required. This recommendation is not automatically authorized.";
+        card.appendChild(review);
 
-            const number = document.createElement("div");
-            number.className = "evidence-index";
-            number.textContent = String(index + 1).padStart(2, "0");
-
-            const content = document.createElement("div");
-            content.className = "evidence-content";
-
-            const heading = document.createElement("h3");
-            heading.textContent = `${match.centre || "Unknown centre"} — ${match.item || "Unknown item"}`;
-            content.appendChild(heading);
-
-            const addDetail = (label, value) => {
-                if (value === null || value === undefined || value === "") return;
-
-                const paragraph = document.createElement("p");
-                const strong = document.createElement("strong");
-                strong.textContent = `${label}: `;
-                paragraph.append(strong, document.createTextNode(String(value)));
-                content.appendChild(paragraph);
-            };
-
-            addDetail("Request", match.request_id);
-            addDetail("Recorded shortfall", match.recorded_shortfall);
-            addDetail("Potential match", match.potential_match_quantity);
-            addDetail("Remaining unmatched", match.remaining_unmatched_quantity);
-
-            (match.candidate_warehouses || []).forEach(warehouse => {
-                addDetail("Candidate warehouse", warehouse.warehouse);
-                addDetail("Recorded stock", warehouse.recorded_stock_quantity);
-            });
-
-            addDetail("Next step", match.next_step);
-
-            const status = document.createElement("span");
-            status.className = "tag";
-            status.textContent = match.status || "Requires verification";
-
-            article.append(number, content, status);
-            matchesContainer.appendChild(article);
-        });
-    }
-
-    if (unmatchedContainer) {
-        unmatchedContainer.replaceChildren();
-
-        if (unmatched.length === 0) {
-            const empty = document.createElement("p");
-            empty.textContent = "No remaining unmatched quantities were returned.";
-            unmatchedContainer.appendChild(empty);
-        }
-
-        unmatched.forEach((item, index) => {
-            const article = document.createElement("article");
-            article.className = "evidence-row";
-
-            const number = document.createElement("div");
-            number.className = "evidence-index";
-            number.textContent = String(index + 1).padStart(2, "0");
-
-            const content = document.createElement("div");
-            content.className = "evidence-content";
-
-            const heading = document.createElement("h3");
-            heading.textContent = `${item.centre || "Unknown centre"} — ${item.item || "Unknown item"}`;
-
-            const request = document.createElement("p");
-            request.textContent = `Request: ${item.request_id || "Unknown"}`;
-
-            const quantity = document.createElement("p");
-            quantity.textContent = `Unmatched quantity: ${item.unmatched_quantity ?? "Unknown"}`;
-
-            const status = document.createElement("p");
-            status.textContent = item.status || "Further verification required";
-
-            content.append(heading, request, quantity, status);
-            article.append(number, content);
-            unmatchedContainer.appendChild(article);
-        });
-    }
+        container.appendChild(card);
+    });
 }
 
 
 function renderInvestigation(result) {
-    updateText("requested-quantity", result.requested);
-    updateText("reported-quantity", result.reported);
-    updateText("confirmed-quantity", result.confirmed);
-    updateText("unconfirmed-quantity", result.gap);
+    // investigation.py returns a flat dictionary.
+    updateText("requested-quantity", result.requested_quantity);
+    updateText("reported-quantity", result.reported_delivered);
+    updateText("confirmed-quantity", result.receipt_confirmed);
+    updateText("unconfirmed-quantity", result.unconfirmed_quantity);
 
-    updateText(
-        "delivery-description",
-        `${result.reported} kits reported as delivered.`
-    );
-    updateText("delivery-value", `${result.reported} kits`);
+    updateText("delivery-description", result.reported_delivered);
+    updateText("delivery-value", result.reported_delivered);
+    updateText("delivery-reference", result.delivery_id);
 
-    updateText(
-        "receipt-description",
-        "Quantity confirmed by the available receipt."
-    );
-    updateText("receipt-value", `${result.confirmed} kits`);
+    updateText("receipt-description", result.receipt_confirmed);
+    updateText("receipt-value", result.receipt_confirmed);
+    updateText("receipt-reference", result.receipt_id);
 
-    updateText("route-name", result.route || "No connected route found");
-    updateText("route-status", result.route_status || "Unknown");
+    updateText("route-name", result.route, "No route record available for this scenario");
+    updateText("route-status", result.route_status, "No route record available");
 
     updateText(
         "incident-description",
-        result.incident || "No connected incident report found."
+        result.incident,
+        "No linked incident lead is available. This does not establish that no disruption occurred."
     );
 
-    updateText(
-        "warehouse-name",
-        result.warehouse || "No connected warehouse found"
-    );
+    updateText("warehouse-name", result.warehouse, "No warehouse record available");
+    updateText("warehouse-stock", result.stock, "No stock quantity available");
 
-    updateText(
-        "warehouse-stock",
-        result.stock === null || result.stock === undefined
-            ? "Unknown"
-            : `${result.stock} kits`
-    );
+    const routeExists = Boolean(result.route);
 
-    if (routeSelect && result.route_status) {
-        routeSelect.value = result.route_status;
+    if (routeSelect) routeSelect.disabled = !routeExists;
+    if (updateRouteButton) updateRouteButton.disabled = !routeExists;
+
+    if (routeUpdateStatus) {
+        routeUpdateStatus.textContent = routeExists
+            ? ""
+            : "Route updates are unavailable because this scenario has no route record.";
     }
 
     renderActions(result.recommended_actions || []);
+    renderCrossCentreFindings(result.cross_centre_findings || []);
 
-    // Refresh cross-centre findings from the same live API response.
-    renderCrossCentreFindings(
-        result.cross_centre_findings || [],
-        result.cross_centre_actions || []
-    );
-    renderResourceMatching(result);
+    // The backend returns these fields at the top level.
+    renderResourceMatching({
+        matches: result.resource_matches || [],
+        unmatched_demand: result.unmatched_demand || [],
+        note: result.resource_matching_note || ""
+    });
+
+    // Action plans are already rendered by the Flask template.
+    // Do not append a second set of cards here.
+
+    if (investigationStatus) {
+        investigationStatus.textContent =
+            "Investigation complete. Review the linked records and uncertainty before acting.";
+    }
+
+    aiAnalysisNeedsRefresh = true;
 }
 
+
 function renderAIList(id, items) {
-    const list = document.getElementById(id);
+    const container = document.getElementById(id);
+    if (!container) return;
 
-    if (!list) return;
-
-    list.replaceChildren();
+    container.replaceChildren();
 
     if (!Array.isArray(items) || items.length === 0) {
-        const item = document.createElement("li");
-        item.textContent = "No items provided.";
-        list.appendChild(item);
+        const message = document.createElement("li");
+        message.textContent = "No items returned.";
+        container.appendChild(message);
         return;
     }
 
-    items.forEach((value) => {
-        const item = document.createElement("li");
-        item.textContent = String(value);
-        list.appendChild(item);
+    items.forEach((item) => {
+        const element = document.createElement("li");
+        element.textContent = typeof item === "string"
+            ? item
+            : item.description || item.title || JSON.stringify(item);
+        container.appendChild(element);
     });
 }
 
-function renderAIAnalysis(analysis) {
-    updateText("ai-summary", analysis.summary);
+function renderAIAnalysis(data) {
+    const analysis = data.analysis || data.ai_analysis || data;
+    updateText("ai-summary", analysis.summary || analysis.overview);
     updateText("ai-evidence-assessment", analysis.evidence_assessment);
+    renderAIList("ai-possible-explanations", analysis.possible_explanations || []);
+    renderAIList("ai-recommended-actions", analysis.recommended_actions || []);
     updateText("ai-confidence", analysis.confidence);
-
-    renderAIList(
-        "ai-possible-explanations",
-        analysis.possible_explanations
-    );
-
-    renderAIList(
-        "ai-recommended-actions",
-        analysis.recommended_actions
-    );
-
-    renderAIList("ai-limitations", analysis.limitations);
+    updateText("ai-limitations", analysis.limitations);
 
     if (aiAnalysisContainer) {
         aiAnalysisContainer.hidden = false;
     }
-
-    aiAnalysisNeedsRefresh = false;
 }
 
 async function runAIInvestigation() {
-    if (!runAIButton || !aiInvestigationStatus) return;
+    if (!runAIButton) return;
 
     runAIButton.disabled = true;
-    aiInvestigationStatus.textContent =
-        "Analyzing current graph evidence with Gemini. This may take a little while...";
+    if (aiInvestigationStatus) {
+        aiInvestigationStatus.textContent = "Running AI analysis for the selected scenario…";
+    }
 
     try {
         const response = await fetch("/api/ai-investigate", {
-            method: "POST"
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scenario_id: getSelectedScenario() })
         });
 
-        const result = await response.json();
+        const data = await readResponse(response);
+        renderAIAnalysis(data);
 
-        if (!response.ok) {
-            throw new Error(result.error || "AI investigation failed.");
+        if (aiInvestigationStatus) {
+            aiInvestigationStatus.textContent =
+                "AI analysis complete. Treat explanations as hypotheses and verify them against the records.";
         }
-
-        if (!result.ai_analysis) {
-            throw new Error("The server returned no AI analysis.");
-        }
-
-        renderAIAnalysis(result.ai_analysis);
-
-        aiInvestigationStatus.textContent =
-            "AI analysis complete. Review the findings and verify all hypotheses against the evidence.";
-
+        aiAnalysisNeedsRefresh = false;
     } catch (error) {
-        aiInvestigationStatus.textContent =
-            `${error.message} You can try again.`;
+        if (aiInvestigationStatus) {
+            aiInvestigationStatus.textContent = `AI analysis failed: ${error.message}`;
+        }
     } finally {
         runAIButton.disabled = false;
     }
+}
+
+async function runInvestigation() {
+    if (!runButton) return;
+
+    runButton.disabled = true;
+    if (investigationStatus) {
+        investigationStatus.textContent = "Investigating the selected scenario…";
+    }
+
+    try {
+        const response = await fetch("/api/investigate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scenario_id: getSelectedScenario() })
+        });
+
+        const data = await readResponse(response);
+        renderInvestigation(data);
+
+        if (investigationStatus) {
+            investigationStatus.textContent = "Investigation complete.";
+        }
+
+        await loadGraphEvidence();
+    } catch (error) {
+        if (investigationStatus) {
+            investigationStatus.textContent = `Investigation failed: ${error.message}`;
+        }
+    } finally {
+        runButton.disabled = false;
+    }
+}
+
+async function updateRouteStatus() {
+    if (!updateRouteButton || !routeSelect) return;
+
+    updateRouteButton.disabled = true;
+    if (routeUpdateStatus) routeUpdateStatus.textContent = "Updating route status…";
+
+    try {
+        const response = await fetch("/api/update-route", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                status: routeSelect.value,
+                scenario_id: getSelectedScenario()
+            })
+        });
+
+        const data = await readResponse(response);
+
+        if (routeUpdateStatus) {
+            routeUpdateStatus.textContent = data.message || "Route status updated.";
+        }
+
+        await runInvestigation();
+    } catch (error) {
+        if (routeUpdateStatus) {
+            routeUpdateStatus.textContent = `Route update failed: ${error.message}`;
+        }
+    } finally {
+        updateRouteButton.disabled = !document.getElementById("route-status-select") ||
+            document.getElementById("route-status-select").disabled;
+    }
+}
+
+function getNodeLabel(node) {
+    const properties = node.properties || {};
+    return properties.name ||
+        properties.id ||
+        properties.item ||
+        properties.description ||
+        (node.labels || []).join(", ") ||
+        "Graph node";
+}
+
+function getNodeType(node) {
+    return (node.labels || []).find((label) => label !== "") || "Node";
+}
+
+function getNodeColor(node) {
+    const type = getNodeType(node);
+
+    const colors = {
+        Community: "#2563eb",
+        ReliefRequest: "#0d9488",
+        Delivery: "#d97706",
+        Receipt: "#16a34a",
+        Route: "#7c3aed",
+        Incident: "#dc2626",
+        IncidentReport: "#dc2626",
+        Warehouse: "#475569",
+        Supply: "#0891b2"
+    };
+
+    return colors[type] || "#64748b";
+}
+
+
+function renderGraphEvidence(data) {
+    const visualization = document.getElementById("graph-visualization");
+    const nodeDetails = document.getElementById("graph-node-details");
+    if (!visualization) return;
+
+    visualization.replaceChildren();
+
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const relationships = Array.isArray(data.relationships)
+        ? data.relationships
+        : [];
+
+    updateText("graph-node-count", data.node_count ?? nodes.length);
+    updateText(
+        "graph-relationship-count",
+        data.relationship_count ?? relationships.length
+    );
+
+    if (nodes.length === 0) {
+        const message = document.createElement("p");
+        message.textContent =
+            "No tagged graph records were found for this scenario.";
+        visualization.appendChild(message);
+
+        if (nodeDetails) {
+            nodeDetails.textContent =
+                "No nodes are available to inspect.";
+        }
+        return;
+    }
+
+    const width = Math.max(
+        760,
+        Math.min(1200, 180 * Math.ceil(Math.sqrt(nodes.length)))
+    );
+    const nodeWidth = 150;
+    const nodeHeight = 58;
+    const gapX = 34;
+    const gapY = 54;
+    const columns = Math.max(
+        1,
+        Math.floor((width - 30) / (nodeWidth + gapX))
+    );
+    const rows = Math.ceil(nodes.length / columns);
+    const height = Math.max(
+        330,
+        rows * (nodeHeight + gapY) + 40
+    );
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Scenario evidence graph");
+
+    const positions = new Map();
+
+    nodes.forEach((node, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+
+        positions.set(String(node.id), {
+            x: 15 + column * (nodeWidth + gapX),
+            y: 20 + row * (nodeHeight + gapY)
+        });
+    });
+
+    relationships.forEach((relationship) => {
+        const source = positions.get(String(relationship.source));
+        const target = positions.get(String(relationship.target));
+        if (!source || !target) return;
+
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", String(source.x + nodeWidth / 2));
+        line.setAttribute("y1", String(source.y + nodeHeight / 2));
+        line.setAttribute("x2", String(target.x + nodeWidth / 2));
+        line.setAttribute("y2", String(target.y + nodeHeight / 2));
+        line.setAttribute("stroke", "#94a3b8");
+        line.setAttribute("stroke-width", "2");
+        svg.appendChild(line);
+
+        const label = document.createElementNS(svgNS, "text");
+        label.setAttribute(
+            "x",
+            String((source.x + target.x + nodeWidth) / 2)
+        );
+        label.setAttribute(
+            "y",
+            String((source.y + target.y + nodeHeight) / 2 - 5)
+        );
+        label.setAttribute("font-size", "10");
+        label.setAttribute("text-anchor", "middle");
+        label.setAttribute("fill", "#475569");
+        label.textContent = relationship.type || "RELATED";
+        svg.appendChild(label);
+    });
+
+    let selectedGroup = null;
+
+    function showNodeDetails(node, group) {
+        if (!nodeDetails) return;
+
+        if (selectedGroup) {
+            selectedGroup.setAttribute("aria-pressed", "false");
+            const oldRect = selectedGroup.querySelector("rect");
+            if (oldRect) {
+                oldRect.setAttribute("stroke", "#ffffff");
+                oldRect.setAttribute("stroke-width", "1.5");
+            }
+        }
+
+        selectedGroup = group;
+        group.setAttribute("aria-pressed", "true");
+
+        const rect = group.querySelector("rect");
+        if (rect) {
+            rect.setAttribute("stroke", "#fbbf24");
+            rect.setAttribute("stroke-width", "3");
+        }
+
+        nodeDetails.replaceChildren();
+
+        const heading = document.createElement("h4");
+        heading.textContent = getNodeLabel(node);
+        nodeDetails.appendChild(heading);
+
+        const type = document.createElement("p");
+        type.textContent = `Type: ${getNodeType(node)}`;
+        nodeDetails.appendChild(type);
+
+        const properties = node.properties || {};
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(properties, null, 2);
+        nodeDetails.appendChild(pre);
+
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.textContent = "Edit node";
+        editButton.className = "secondary-button";
+
+        editButton.addEventListener("click", () => {
+            showNodeEditor(node, nodeDetails);
+        });
+
+        nodeDetails.appendChild(editButton);
+    }
+
+    nodes.forEach((node) => {
+        const position = positions.get(String(node.id));
+        const group = document.createElementNS(svgNS, "g");
+
+        group.setAttribute("tabindex", "0");
+        group.setAttribute("role", "button");
+        group.setAttribute("aria-pressed", "false");
+        group.setAttribute("aria-label", `Inspect ${getNodeLabel(node)}`);
+        group.style.cursor = "pointer";
+
+        const rectangle = document.createElementNS(svgNS, "rect");
+        rectangle.setAttribute("x", String(position.x));
+        rectangle.setAttribute("y", String(position.y));
+        rectangle.setAttribute("width", String(nodeWidth));
+        rectangle.setAttribute("height", String(nodeHeight));
+        rectangle.setAttribute("rx", "10");
+        rectangle.setAttribute("fill", getNodeColor(node));
+        rectangle.setAttribute("stroke", "#ffffff");
+        rectangle.setAttribute("stroke-width", "1.5");
+        group.appendChild(rectangle);
+
+        const typeLabel = document.createElementNS(svgNS, "text");
+        typeLabel.setAttribute(
+            "x",
+            String(position.x + nodeWidth / 2)
+        );
+        typeLabel.setAttribute("y", String(position.y + 20));
+        typeLabel.setAttribute("text-anchor", "middle");
+        typeLabel.setAttribute("font-size", "10");
+        typeLabel.setAttribute("fill", "#ffffff");
+        typeLabel.textContent = getNodeType(node);
+        group.appendChild(typeLabel);
+
+        const nameLabel = document.createElementNS(svgNS, "text");
+        nameLabel.setAttribute(
+            "x",
+            String(position.x + nodeWidth / 2)
+        );
+        nameLabel.setAttribute("y", String(position.y + 40));
+        nameLabel.setAttribute("text-anchor", "middle");
+        nameLabel.setAttribute("font-size", "10");
+        nameLabel.setAttribute("fill", "#ffffff");
+
+        const labelText = getNodeLabel(node);
+        nameLabel.textContent = labelText.length > 21
+            ? `${labelText.slice(0, 18)}…`
+            : labelText;
+
+        group.appendChild(nameLabel);
+
+        group.addEventListener("click", () => {
+            showNodeDetails(node, group);
+        });
+
+        group.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                showNodeDetails(node, group);
+            }
+        });
+
+        svg.appendChild(group);
+    });
+
+    visualization.appendChild(svg);
+
+    if (nodeDetails) {
+        nodeDetails.textContent =
+            "Select a node to inspect its record.";
+    }
+}
+
+
+function showNodeEditor(node, container) {
+    container.replaceChildren();
+
+    const properties = node.properties || {};
+    const editableProperties = new Set([
+        "name",
+        "description",
+        "status",
+        "quantity",
+        "reported_quantity",
+        "confirmed_quantity"
+    ]);
+
+    const heading = document.createElement("h4");
+    heading.textContent = `Edit node: ${getNodeLabel(node)}`;
+    container.appendChild(heading);
+
+    const notice = document.createElement("p");
+    notice.className = "record-reference";
+    notice.textContent =
+        "Edit one permitted property at a time. Every saved change requires a reason and creates an audit record.";
+    container.appendChild(notice);
+
+    const form = document.createElement("form");
+    form.className = "node-editor-form";
+
+    Object.entries(properties).forEach(([key, value]) => {
+        const field = document.createElement("div");
+        field.className = "node-editor-field";
+
+        const label = document.createElement("label");
+        label.textContent = key;
+        label.htmlFor = `node-property-${key}`;
+        field.appendChild(label);
+
+        const input = document.createElement("input");
+        input.id = `node-property-${key}`;
+        input.name = key;
+        input.value = value == null ? "" : String(value);
+
+        const canEdit = editableProperties.has(key);
+
+        input.disabled = !canEdit;
+        if (!canEdit) {
+            input.title = "This property is read-only.";
+        }
+
+        if (
+            ["quantity", "reported_quantity", "confirmed_quantity"].includes(key)
+        ) {
+            input.type = "number";
+            input.step = "1";
+            input.min = "0";
+            input.required = true;
+        } else {
+            input.type = "text";
+        }
+
+        field.appendChild(input);
+        form.appendChild(field);
+    });
+
+    const reasonField = document.createElement("div");
+    reasonField.className = "node-editor-field";
+
+    const reasonLabel = document.createElement("label");
+    reasonLabel.textContent = "Reason for change";
+    reasonLabel.htmlFor = "node-edit-reason";
+    reasonField.appendChild(reasonLabel);
+
+    const reasonInput = document.createElement("textarea");
+    reasonInput.id = "node-edit-reason";
+    reasonInput.name = "reason";
+    reasonInput.required = true;
+    reasonInput.minLength = 3;
+    reasonInput.placeholder =
+        "Explain why this record needs to be corrected.";
+    reasonField.appendChild(reasonInput);
+    form.appendChild(reasonField);
+
+    const buttons = document.createElement("div");
+    buttons.className = "node-editor-buttons";
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = "Cancel";
+    cancelButton.addEventListener("click", () => {
+        renderGraphEvidenceSelectionPlaceholder(container, node);
+    });
+
+    const previewButton = document.createElement("button");
+    previewButton.type = "submit";
+    previewButton.textContent = "Preview changes";
+
+    buttons.append(cancelButton, previewButton);
+    form.appendChild(buttons);
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        if (!form.reportValidity()) return;
+
+        const changes = [];
+
+        for (const key of editableProperties) {
+            if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+                continue;
+            }
+
+            const input = form.elements.namedItem(key);
+            if (!input) continue;
+
+            const oldValue = properties[key];
+            let newValue = input.value;
+
+            if (
+                ["quantity", "reported_quantity", "confirmed_quantity"].includes(key)
+            ) {
+                if (newValue.trim() === "") {
+                    input.setCustomValidity("Enter a whole number.");
+                    input.reportValidity();
+                    return;
+                }
+
+                newValue = Number(newValue);
+
+                if (
+                    !Number.isSafeInteger(newValue) ||
+                    newValue < 0
+                ) {
+                    input.setCustomValidity(
+                        "Enter a non-negative whole number."
+                    );
+                    input.reportValidity();
+                    return;
+                }
+
+                input.setCustomValidity("");
+            }
+
+            if (String(newValue) !== String(oldValue ?? "")) {
+                changes.push({
+                    property: key,
+                    old_value: oldValue,
+                    new_value: newValue
+                });
+            }
+        }
+
+        container.replaceChildren();
+
+        const previewHeading = document.createElement("h4");
+        previewHeading.textContent = "Change preview";
+        container.appendChild(previewHeading);
+
+        if (changes.length === 0) {
+            const message = document.createElement("p");
+            message.textContent = "No property values were changed.";
+            container.appendChild(message);
+        } else {
+            const list = document.createElement("pre");
+            list.textContent = JSON.stringify(changes, null, 2);
+            container.appendChild(list);
+        }
+
+        const reason = document.createElement("p");
+        reason.textContent = `Reason: ${reasonInput.value.trim()}`;
+        container.appendChild(reason);
+
+        const explanation = document.createElement("p");
+        explanation.className = "record-reference";
+        explanation.textContent =
+            "Review the change carefully. Nothing has been saved yet.";
+        container.appendChild(explanation);
+
+        const backButton = document.createElement("button");
+        backButton.type = "button";
+        backButton.textContent = "Back to editor";
+        backButton.addEventListener("click", () => {
+            showNodeEditor(node, container);
+        });
+        container.appendChild(backButton);
+
+        if (changes.length !== 1) {
+            const guidance = document.createElement("p");
+            guidance.textContent = changes.length > 1
+                ? "Save one property at a time. Return to the editor and change only one property."
+                : "Change one editable property before saving.";
+            container.appendChild(guidance);
+            return;
+        }
+
+        const saveButton = document.createElement("button");
+        saveButton.type = "button";
+        saveButton.textContent = "Save changes";
+        saveButton.className = "primary-button";
+        container.appendChild(saveButton);
+
+        const saveStatus = document.createElement("p");
+        saveStatus.setAttribute("role", "status");
+        saveStatus.setAttribute("aria-live", "polite");
+        container.appendChild(saveStatus);
+
+        saveButton.addEventListener("click", async () => {
+            saveButton.disabled = true;
+            backButton.disabled = true;
+            saveStatus.textContent = "Saving change to FalkorDB…";
+
+            try {
+                const response = await fetch("/api/update-node", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        scenario_id: getSelectedScenario(),
+                        node_id: node.id,
+                        property: changes[0].property,
+                        new_value: changes[0].new_value,
+                        reason: reasonInput.value.trim()
+                    })
+                });
+
+                const result = await readResponse(response);
+
+                saveStatus.textContent =
+                    result.message || "The server reported that the change was saved.";
+
+                // Reload the graph and current investigation from the server.
+                await runInvestigation();
+            } catch (error) {
+                saveStatus.textContent =
+                    `Save failed: ${error.message}. Check the current database value before retrying.`;
+                saveButton.disabled = false;
+                backButton.disabled = false;
+            }
+        });
+    });
+
+    container.appendChild(form);
+}
+
+function renderGraphEvidenceSelectionPlaceholder(container, node) {
+    const heading = document.createElement("h4");
+    heading.textContent = getNodeLabel(node);
+
+    const message = document.createElement("p");
+    message.textContent =
+        "Select this node in the graph again to inspect its properties.";
+
+    container.replaceChildren(heading, message);
+}
+
+
+async function loadGraphEvidence() {
+    const status = document.getElementById("graph-explorer-status");
+    if (status) status.textContent = "Loading graph evidence…";
+
+    try {
+        const scenario = encodeURIComponent(getSelectedScenario());
+        const response = await fetch(`/api/graph-evidence?scenario_id=${scenario}`);
+        const data = await readResponse(response);
+        renderGraphEvidence(data);
+
+        if (status) {
+            status.textContent = `Showing graph evidence for ${data.scenario_id || getSelectedScenario()}.`;
+        }
+    } catch (error) {
+        if (status) status.textContent = `Could not load graph evidence: ${error.message}`;
+    }
+}
+
+if (scenarioSelect) {
+    scenarioSelect.addEventListener("change", () => {
+        const scenario = encodeURIComponent(scenarioSelect.value);
+        window.location.href = `/?scenario_id=${scenario}`;
+    });
+}
+
+if (runButton) {
+    runButton.addEventListener("click", runInvestigation);
+}
+
+if (updateRouteButton) {
+    updateRouteButton.addEventListener("click", updateRouteStatus);
 }
 
 if (runAIButton) {
     runAIButton.addEventListener("click", runAIInvestigation);
 }
 
-if (runButton && investigationStatus) {
-    runButton.addEventListener("click", async () => {
-        runButton.disabled = true;
-        investigationStatus.textContent =
-            "Investigating graph evidence and checking all relief centres...";
-
-        try {
-            const response = await fetch("/api/investigate", {
-                method: "POST"
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || "Investigation failed.");
-            }
-
-            renderInvestigation(result);
-
-            // Existing AI output may no longer match the current graph.
-            aiAnalysisNeedsRefresh = true;
-
-            if (aiAnalysisContainer) {
-                aiAnalysisContainer.hidden = true;
-            }
-
-            if (aiInvestigationStatus) {
-                aiInvestigationStatus.textContent =
-                    "Graph evidence refreshed. Run AI investigation to generate an updated analysis.";
-            }
-
-            investigationStatus.textContent =
-                `Investigation complete. ${result.gap} kits remain unconfirmed. ` +
-                `${(result.leads || []).length} original lead(s) require review. ` +
-                `${(result.cross_centre_findings || []).length} cross-centre finding(s) checked.`;
-
-        } catch (error) {
-            investigationStatus.textContent = error.message;
-        } finally {
-            runButton.disabled = false;
-        }
-    });
+if (routeSelect && updateRouteButton) {
+    const routeName = document.getElementById("route-name")?.textContent || "";
+    const routeMissing = !routeName || routeName.toLowerCase().includes("no route record");
+    routeSelect.disabled = routeMissing;
+    updateRouteButton.disabled = routeMissing;
 }
 
-if (routeSelect && updateRouteButton && routeUpdateStatus) {
-    updateRouteButton.addEventListener("click", async () => {
-        updateRouteButton.disabled = true;
-        routeUpdateStatus.textContent = "Updating route status...";
-
-        try {
-            const response = await fetch("/api/update-route", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    status: routeSelect.value
-                })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || "Route update failed.");
-            }
-
-            updateText("route-name", result.route);
-            updateText("route-status", result.route_status);
-
-            routeSelect.value = result.route_status;
-
-            aiAnalysisNeedsRefresh = true;
-
-            if (aiAnalysisContainer) {
-                aiAnalysisContainer.hidden = true;
-            }
-
-            if (aiInvestigationStatus) {
-                aiInvestigationStatus.textContent =
-                    "Route status changed. Run the AI investigation again to refresh its analysis.";
-            }
-
-            routeUpdateStatus.textContent =
-                `${result.route} status updated to ${result.route_status}.`;
-
-        } catch (error) {
-            routeUpdateStatus.textContent = error.message;
-        } finally {
-            updateRouteButton.disabled = false;
-        }
-    });
-}
-
-// --------------------------------------------------
-// EXISTING: Interactive FalkorDB graph explorer
-// --------------------------------------------------
-
-async function loadGraphEvidence() {
-    const status = document.getElementById("graph-explorer-status");
-    const visualization = document.getElementById("graph-visualization");
-    const details = document.getElementById("graph-node-details");
-    const nodeCount = document.getElementById("graph-node-count");
-    const relationshipCount = document.getElementById(
-        "graph-relationship-count"
-    );
-
-    if (!status || !visualization || !details) {
-        return;
-    }
-
-    status.textContent = "Loading graph evidence…";
-
-    try {
-        const response = await fetch("/api/graph-evidence");
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-            throw new Error(data.error || "Could not load graph evidence.");
-        }
-
-        nodeCount.textContent = data.node_count;
-        relationshipCount.textContent = data.relationship_count;
-
-        visualization.replaceChildren();
-
-        const svgNS = "http://www.w3.org/2000/svg";
-        const width = 900;
-        const height = 560;
-
-        const svg = document.createElementNS(svgNS, "svg");
-        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        svg.setAttribute("role", "img");
-        svg.setAttribute(
-            "aria-label",
-            "Connected relief investigation evidence graph"
-        );
-
-        const positions = {
-            Community: [110, 130],
-            ReliefRequest: [310, 130],
-            Delivery: [510, 130],
-            Receipt: [740, 130],
-            Route: [510, 330],
-            IncidentReport: [740, 430],
-            Warehouse: [110, 390],
-            Supply: [310, 390]
-        };
-
-        const colors = {
-            Community: "#2563eb",
-            ReliefRequest: "#7c3aed",
-            Delivery: "#0f766e",
-            Receipt: "#15803d",
-            Route: "#b45309",
-            IncidentReport: "#b91c1c",
-            Warehouse: "#475569",
-            Supply: "#64748b"
-        };
-
-        const nodeById = new Map(
-            data.nodes.map(node => [node.id, node])
-        );
-
-        const nodeElements = new Map();
-
-        function getLabel(node) {
-            const label = node.labels?.[0] || "Node";
-            const properties = node.properties || {};
-
-            if (label === "Community") {
-                return properties.name || label;
-            }
-
-            if (
-                label === "ReliefRequest" ||
-                label === "Delivery" ||
-                label === "Receipt"
-            ) {
-                return properties.id || label;
-            }
-
-            if (label === "Warehouse") {
-                return properties.name || "Warehouse";
-            }
-
-            if (label === "Supply") {
-                return properties.item || label;
-            }
-
-            if (label === "Route") {
-                return properties.name || "Route";
-            }
-
-            if (label === "IncidentReport") {
-                return "Simulated incident";
-            }
-
-            return label;
-        }
-
-        // Draw relationship lines before nodes.
-        data.relationships.forEach(relationship => {
-            const source = nodeById.get(relationship.source);
-            const target = nodeById.get(relationship.target);
-
-            if (!source || !target) {
-                return;
-            }
-
-            const sourcePosition = positions[source.labels?.[0]];
-            const targetPosition = positions[target.labels?.[0]];
-
-            if (!sourcePosition || !targetPosition) {
-                return;
-            }
-
-            const [x1, y1] = sourcePosition;
-            const [x2, y2] = targetPosition;
-
-            const line = document.createElementNS(svgNS, "line");
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            line.setAttribute("stroke", "#94a3b8");
-            line.setAttribute("stroke-width", "2");
-            line.setAttribute("marker-end", "url(#graph-arrow)");
-            svg.appendChild(line);
-
-            const text = document.createElementNS(svgNS, "text");
-            text.setAttribute("x", (x1 + x2) / 2);
-            text.setAttribute("y", (y1 + y2) / 2 - 9);
-            text.setAttribute("text-anchor", "middle");
-            text.setAttribute("class", "graph-edge-label");
-            text.textContent = relationship.type;
-            svg.appendChild(text);
-        });
-
-        const defs = document.createElementNS(svgNS, "defs");
-        const marker = document.createElementNS(svgNS, "marker");
-        marker.setAttribute("id", "graph-arrow");
-        marker.setAttribute("markerWidth", "8");
-        marker.setAttribute("markerHeight", "8");
-        marker.setAttribute("refX", "6");
-        marker.setAttribute("refY", "3");
-        marker.setAttribute("orient", "auto");
-
-        const arrow = document.createElementNS(svgNS, "path");
-        arrow.setAttribute("d", "M0,0 L0,6 L6,3 z");
-        arrow.setAttribute("fill", "#94a3b8");
-
-        marker.appendChild(arrow);
-        defs.appendChild(marker);
-        svg.prepend(defs);
-
-        data.nodes.forEach(node => {
-            const label = node.labels?.[0] || "Node";
-            const position = positions[label];
-
-            if (!position) {
-                return;
-            }
-
-            const [x, y] = position;
-            const group = document.createElementNS(svgNS, "g");
-
-            group.setAttribute("class", "graph-node");
-            group.setAttribute("tabindex", "0");
-            group.setAttribute("role", "button");
-            group.setAttribute(
-                "aria-label",
-                `Inspect ${label}: ${getLabel(node)}`
-            );
-
-            const rect = document.createElementNS(svgNS, "rect");
-            rect.setAttribute("x", x - 72);
-            rect.setAttribute("y", y - 27);
-            rect.setAttribute("width", "144");
-            rect.setAttribute("height", "54");
-            rect.setAttribute("rx", "10");
-            rect.setAttribute("fill", colors[label] || "#475569");
-
-            const title = document.createElementNS(svgNS, "text");
-            title.setAttribute("x", x);
-            title.setAttribute("y", y + 5);
-            title.setAttribute("text-anchor", "middle");
-            title.setAttribute("class", "graph-node-label");
-            title.textContent = getLabel(node);
-
-            group.append(rect, title);
-
-            function showDetails() {
-                details.replaceChildren();
-
-                const heading = document.createElement("h3");
-                heading.textContent = label;
-
-                const name = document.createElement("p");
-                name.textContent = getLabel(node);
-
-                details.append(heading, name);
-
-                if (label === "IncidentReport") {
-                    const warning = document.createElement("p");
-                    warning.className = "graph-simulated-warning";
-                    warning.textContent =
-                        "SIMULATED DEMO DATA — not evidence of a real incident.";
-                    details.appendChild(warning);
-                }
-
-                const propertiesHeading = document.createElement("h4");
-                propertiesHeading.textContent = "Recorded properties";
-                details.appendChild(propertiesHeading);
-
-                const list = document.createElement("dl");
-
-                Object.entries(node.properties || {}).forEach(
-                    ([key, value]) => {
-                        const term = document.createElement("dt");
-                        term.textContent = key;
-
-                        const description = document.createElement("dd");
-                        description.textContent = String(value);
-
-                        list.append(term, description);
-                    }
-                );
-
-                details.appendChild(list);
-
-                const connectedHeading = document.createElement("h4");
-                connectedHeading.textContent = "Connected relationships";
-                details.appendChild(connectedHeading);
-
-                const connected = data.relationships.filter(
-                    relationship =>
-                        relationship.source === node.id ||
-                        relationship.target === node.id
-                );
-
-                if (connected.length === 0) {
-                    const empty = document.createElement("p");
-                    empty.textContent = "No connected relationships.";
-                    details.appendChild(empty);
-                } else {
-                    const relationshipList = document.createElement("ul");
-
-                    connected.forEach(relationship => {
-                        const otherId =
-                            relationship.source === node.id
-                                ? relationship.target
-                                : relationship.source;
-
-                        const otherNode = nodeById.get(otherId);
-                        const item = document.createElement("li");
-
-                        const direction =
-                            relationship.source === node.id ? "→" : "←";
-
-                        item.textContent =
-                            `${relationship.type} ${direction} ` +
-                            `${otherNode ? getLabel(otherNode) : otherId}`;
-
-                        relationshipList.appendChild(item);
-                    });
-
-                    details.appendChild(relationshipList);
-                }
-            }
-
-            group.addEventListener("click", showDetails);
-
-            group.addEventListener("keydown", event => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    showDetails();
-                }
-            });
-
-            svg.appendChild(group);
-            nodeElements.set(node.id, group);
-        });
-
-        visualization.appendChild(svg);
-        status.textContent = "Graph evidence loaded successfully.";
-
-        if (data.nodes.length > 0) {
-            const firstNode = data.nodes[0];
-            const firstElement = nodeElements.get(firstNode.id);
-
-            if (firstElement) {
-                firstElement.dispatchEvent(new Event("click"));
-            }
-        }
-    } catch (error) {
-        console.error("Graph evidence loading failed:", error);
-        status.textContent =
-            "Could not load graph evidence. Check the Flask terminal.";
-    }
-}
-
-document.addEventListener("DOMContentLoaded", loadGraphEvidence);
+loadGraphEvidence();

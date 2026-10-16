@@ -675,3 +675,33 @@ button:disabled {
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+.scenario-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 220px;
+    max-width: 320px;
+}
+
+.scenario-selector label {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.scenario-selector select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border, #d1d5db);
+    border-radius: 10px;
+    background: var(--surface, #ffffff);
+    color: inherit;
+    font: inherit;
+}
+
+@media (max-width: 700px) {
+    .scenario-selector {
+        width: 100%;
+        max-width: none;
+    }
+}

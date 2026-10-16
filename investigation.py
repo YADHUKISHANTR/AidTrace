@@ -136,11 +136,10 @@ def build_action_plans(
     return action_plans
 
 
-
-def get_resource_matches(graph):
+def get_resource_matches(graph, scenario_id="wayanad"):
     """
     Find potential matches between recorded unmet demand and recorded
-    warehouse stock.
+    warehouse stock within the selected scenario.
 
     Requests remain visible even when delivery or receipt records are
     missing. Missing receipt evidence is treated as zero confirmed
@@ -152,21 +151,33 @@ def get_resource_matches(graph):
     """
 
     demand_query = """
-    MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest)
-    OPTIONAL MATCH (r)-[:FULFILLED_BY]->(d:Delivery)
-    OPTIONAL MATCH (d)-[:HAS_RECEIPT]->(rec:Receipt)
+    
+            MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest)
+            WHERE c.scenario_id = $scenario_id
+            AND r.scenario_id = $scenario_id
 
-    RETURN
-        c.name AS centre,
-        r.id AS request_id,
-        r.item AS item,
-        r.quantity AS requested,
-        rec.confirmed_quantity AS confirmed
-    ORDER BY centre, request_id
+            OPTIONAL MATCH (r)-[:FULFILLED_BY]->(d:Delivery)
+            WHERE d.scenario_id = $scenario_id
+
+            OPTIONAL MATCH (d)-[:HAS_RECEIPT]->(rec:Receipt)
+            WHERE rec.scenario_id = $scenario_id
+
+            RETURN
+                c.name AS centre,
+                r.id AS request_id,
+                r.item AS item,
+                r.quantity AS requested,
+                rec.confirmed_quantity AS confirmed
+            ORDER BY centre, request_id
+
     """
 
+    # Warehouse and supply nodes will need scenario_id properties
+    # before this query can safely return scenario-specific stock.
     stock_query = """
     MATCH (w:Warehouse)-[:STORES]->(s:Supply)
+    WHERE w.scenario_id = $scenario_id
+      AND s.scenario_id = $scenario_id
     RETURN
         w.name AS warehouse,
         s.item AS item,
@@ -174,8 +185,16 @@ def get_resource_matches(graph):
     ORDER BY w.name, s.item
     """
 
-    demand_result = graph.query(demand_query)
-    stock_result = graph.query(stock_query)
+   
+    demand_result = graph.query(
+        demand_query,
+        {"scenario_id": scenario_id},
+    )
+    stock_result = graph.query(
+        stock_query,
+        {"scenario_id": scenario_id},
+    )
+   
 
     demands_by_item = {}
 
@@ -185,11 +204,8 @@ def get_resource_matches(graph):
         if not item or requested is None:
             continue
 
-        # Missing receipt evidence means no quantity is currently
-        # confirmed by a receipt record. It does not prove non-delivery.
         receipt_evidence_available = confirmed is not None
         confirmed_quantity = confirmed if confirmed is not None else 0
-
         shortfall = max(requested - confirmed_quantity, 0)
 
         if shortfall <= 0:
@@ -284,7 +300,6 @@ def get_resource_matches(graph):
                     ),
                 })
 
-            
             if remaining_need > 0:
                 unmatched_demand.append({
                     "centre": demand["centre"],
@@ -299,23 +314,31 @@ def get_resource_matches(graph):
                     ),
                 })
 
-
     return {
         "resource_matches": matches,
         "unmatched_demand": unmatched_demand,
         "resource_matching_note": (
-            "Matches are independent, non-additive planning leads. "
-            "The same warehouse stock may appear as a candidate for "
-            "multiple centres. Do not sum these matches or treat them "
-            "as allocations. Missing receipt evidence does not prove "
-            "non-delivery. Physical availability, existing commitments, "
-            "and transfer authority must be verified."
+            "Matches are potential leads based on recorded stock, not "
+            "confirmed available resources. Recorded quantities may be "
+            "outdated, duplicated, committed elsewhere, or physically "
+            "unavailable. The same stock may appear as a candidate for "
+            "multiple centres, so matches must not be summed across "
+            "centres or treated as allocations. Missing receipt evidence "
+            "does not prove non-delivery. Verify warehouse records, "
+            "physical stock, existing commitments, and transfer authority "
+            "before making allocation decisions."
         ),
     }
 
 
+def get_investigation(scenario_id="wayanad"):
+    """Investigate records belonging to one selected scenario."""
 
-def get_investigation():
+    allowed_scenarios = {"wayanad", "assam"}
+
+    if scenario_id not in allowed_scenarios:
+        raise ValueError(f"Unsupported scenario: {scenario_id}")
+
     db = FalkorDB(host="localhost", port=6379)
     graph = db.select_graph("aidtrace")
 
@@ -329,6 +352,12 @@ def get_investigation():
 
     OPTIONAL MATCH (w:Warehouse)-[:STORES]->(s:Supply)
     WHERE s.item = r.item
+
+    WITH c, r, d, rec, route, incident, w, s
+    WHERE c.scenario_id = $scenario_id
+      AND r.scenario_id = $scenario_id
+      AND d.scenario_id = $scenario_id
+      AND rec.scenario_id = $scenario_id
 
     RETURN
         c.name AS community,
@@ -347,7 +376,7 @@ def get_investigation():
         s.quantity AS stock
     """
 
-    result = graph.query(query)
+    result = graph.query(query, {"scenario_id": scenario_id})
 
     if not result.result_set:
         return None
@@ -495,6 +524,12 @@ def get_investigation():
           -[:FULFILLED_BY]->(d:Delivery)
           -[:HAS_RECEIPT]->(rec:Receipt)
 
+    WITH c, r, d, rec
+    WHERE c.scenario_id = $scenario_id
+      AND r.scenario_id = $scenario_id
+      AND d.scenario_id = $scenario_id
+      AND rec.scenario_id = $scenario_id
+
     RETURN
         c.name AS centre,
         c.location AS location,
@@ -504,10 +539,14 @@ def get_investigation():
         d.id AS delivery_id,
         d.reported_quantity AS reported,
         rec.confirmed_quantity AS confirmed
-    ORDER BY c.name, r.id
+    ORDER BY centre, request_id
     """
 
-    cross_centre_result = graph.query(cross_centre_query)
+    cross_centre_result = graph.query(
+        cross_centre_query,
+        {"scenario_id": scenario_id},
+    )
+
     cross_centre_findings = []
     cross_centre_actions = []
     records_by_item = {}
@@ -632,7 +671,9 @@ def get_investigation():
                         f"to {centre_name} are not confirmed by its receipt."
                     ),
                     "status": "Unresolved",
-                    "next_step": "Request additional receipts or handover records.",
+                    "next_step": (
+                        "Request additional receipts or handover records."
+                    ),
                 })
 
         demo_centre_names = {"Centre A", "Centre B"}
@@ -694,7 +735,7 @@ def get_investigation():
             "deliveries before concluding that an imbalance exists.",
         ])
 
-    resource_matching = get_resource_matches(graph)
+    resource_matching = get_resource_matches(graph, scenario_id)
 
     action_plans = build_action_plans(
         request_id=request_id,
@@ -711,6 +752,7 @@ def get_investigation():
     )
 
     return {
+        "scenario_id": scenario_id,
         "case_id": request_id,
         "community": community,
         "request_id": request_id,

@@ -18,20 +18,20 @@ MERGE (w)-[:STORES]->(s)
 """)
 
 # Add a route and a synthetic incident report
+# Stock information — Wayanad demonstration scenario
 graph.query("""
-MERGE (route:Route {id: 'ROUTE-001'})
-SET route.name = 'Thamarassery Ghat Road',
-    route.status = 'Disrupted'
+MERGE (w:Warehouse {id: 'WH-001'})
+SET w.name = 'Kalpetta Relief Supply Warehouse',
+    w.item = 'Water kits',
+    w.available_quantity = 20,
+    w.scenario_id = 'wayanad'
 
-MERGE (incident:IncidentReport {id: 'INC-001'})
-SET incident.description =
-    'SIMULATED DEMO: temporary disruption on Thamarassery Ghat Road',
-    incident.status = 'Simulated'
+MERGE (s:Supply {id: 'SUP-001'})
+SET s.item = 'Water kits',
+    s.quantity = 20,
+    s.scenario_id = 'wayanad'
 
-MERGE (incident)-[:AFFECTS]->(route)
-
-MERGE (d:Delivery {id: 'DEL-001'})
-MERGE (d)-[:TRANSPORTED_VIA]->(route)
+MERGE (w)-[:STORES]->(s)
 """)
 
 print("Additional simulated Kerala evidence added to AidTrace.")
