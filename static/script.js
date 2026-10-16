@@ -44,6 +44,160 @@ function renderActions(actions) {
     });
 }
 
+// --------------------------------------------------
+// NEW: Cross-centre findings and action rendering
+// --------------------------------------------------
+
+function appendFindingDetail(container, label, value) {
+    if (value === null || value === undefined || value === "") {
+        return;
+    }
+
+    const paragraph = document.createElement("p");
+    const strong = document.createElement("strong");
+
+    strong.textContent = `${label}: `;
+    paragraph.appendChild(strong);
+    paragraph.appendChild(document.createTextNode(String(value)));
+
+    container.appendChild(paragraph);
+}
+
+function renderCrossCentreFindings(findings, actions) {
+    const findingsContainer =
+        document.getElementById("cross-centre-findings");
+
+    const actionsContainer =
+        document.getElementById("cross-centre-actions");
+
+    const section = document.getElementById("cross-centre-section");
+
+    if (!section) return;
+
+    const sectionCount = section.querySelector(".section-count");
+
+    if (sectionCount) {
+        sectionCount.textContent =
+            `${Array.isArray(findings) ? findings.length : 0} findings`;
+    }
+
+    if (findingsContainer) {
+        findingsContainer.replaceChildren();
+
+        if (!Array.isArray(findings) || findings.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "investigation-status";
+            empty.textContent =
+                "No cross-centre discrepancy findings were returned by the current graph query.";
+
+            findingsContainer.appendChild(empty);
+        } else {
+            findings.forEach((finding, index) => {
+                const article = document.createElement("article");
+                article.className = "evidence-row cross-centre-finding";
+
+                const number = document.createElement("div");
+                number.className = "evidence-index";
+                number.textContent = String(index + 1).padStart(2, "0");
+
+                const content = document.createElement("div");
+                content.className = "evidence-content";
+
+                const heading = document.createElement("h3");
+                heading.textContent = finding.title || "Discrepancy finding";
+                content.appendChild(heading);
+
+                if (finding.centre) {
+                    appendFindingDetail(content, "Centre", finding.centre);
+                }
+
+                if (Array.isArray(finding.centres)) {
+                    appendFindingDetail(
+                        content,
+                        "Centres compared",
+                        finding.centres.join(" ↔ ")
+                    );
+                }
+
+                appendFindingDetail(content, "Item", finding.item);
+                appendFindingDetail(
+                    content,
+                    "Request reference",
+                    finding.request_id
+                );
+
+                if (finding.requested_quantity !== undefined) {
+                    appendFindingDetail(
+                        content,
+                        "Requested",
+                        finding.requested_quantity
+                    );
+                }
+
+                if (
+                    finding.reported_quantity !== undefined &&
+                    finding.reported_quantity !== null
+                ) {
+                    appendFindingDetail(
+                        content,
+                        "Reported delivered",
+                        finding.reported_quantity
+                    );
+                }
+
+                if (
+                    finding.confirmed_quantity !== undefined &&
+                    finding.confirmed_quantity !== null
+                ) {
+                    appendFindingDetail(
+                        content,
+                        "Receipt-confirmed",
+                        finding.confirmed_quantity
+                    );
+                }
+
+                appendFindingDetail(content, "Finding", finding.finding);
+                appendFindingDetail(
+                    content,
+                    "Verification step",
+                    finding.next_step
+                );
+
+                const status = document.createElement("span");
+                status.className = "tag";
+                status.textContent = finding.status || "Unverified";
+
+                article.append(number, content, status);
+                findingsContainer.appendChild(article);
+            });
+        }
+    }
+
+    if (actionsContainer) {
+        actionsContainer.replaceChildren();
+
+        if (!Array.isArray(actions) || actions.length === 0) {
+            const empty = document.createElement("li");
+            empty.textContent = "No additional cross-centre actions.";
+            actionsContainer.appendChild(empty);
+        } else {
+            actions.forEach((action, index) => {
+                const item = document.createElement("li");
+
+                const number = document.createElement("span");
+                number.className = "action-number";
+                number.textContent = index + 1;
+
+                const text = document.createElement("p");
+                text.textContent = action;
+
+                item.append(number, text);
+                actionsContainer.appendChild(item);
+            });
+        }
+    }
+}
+
 function renderInvestigation(result) {
     updateText("requested-quantity", result.requested);
     updateText("reported-quantity", result.reported);
@@ -87,6 +241,12 @@ function renderInvestigation(result) {
     }
 
     renderActions(result.recommended_actions || []);
+
+    // Refresh cross-centre findings from the same live API response.
+    renderCrossCentreFindings(
+        result.cross_centre_findings || [],
+        result.cross_centre_actions || []
+    );
 }
 
 function renderAIList(id, items) {
@@ -149,9 +309,7 @@ async function runAIInvestigation() {
         const result = await response.json();
 
         if (!response.ok) {
-            throw new Error(
-                result.error || "AI investigation failed."
-            );
+            throw new Error(result.error || "AI investigation failed.");
         }
 
         if (!result.ai_analysis) {
@@ -178,7 +336,8 @@ if (runAIButton) {
 if (runButton && investigationStatus) {
     runButton.addEventListener("click", async () => {
         runButton.disabled = true;
-        investigationStatus.textContent = "Investigating graph evidence...";
+        investigationStatus.textContent =
+            "Investigating graph evidence and checking all relief centres...";
 
         try {
             const response = await fetch("/api/investigate", {
@@ -207,7 +366,8 @@ if (runButton && investigationStatus) {
 
             investigationStatus.textContent =
                 `Investigation complete. ${result.gap} kits remain unconfirmed. ` +
-                `${(result.leads || []).length} lead(s) require review.`;
+                `${(result.leads || []).length} original lead(s) require review. ` +
+                `${(result.cross_centre_findings || []).length} cross-centre finding(s) checked.`;
 
         } catch (error) {
             investigationStatus.textContent = error.message;
@@ -265,6 +425,10 @@ if (routeSelect && updateRouteButton && routeUpdateStatus) {
         }
     });
 }
+
+// --------------------------------------------------
+// EXISTING: Interactive FalkorDB graph explorer
+// --------------------------------------------------
 
 async function loadGraphEvidence() {
     const status = document.getElementById("graph-explorer-status");
@@ -342,16 +506,16 @@ async function loadGraphEvidence() {
                 return properties.name || label;
             }
 
-            if (label === "ReliefRequest" || label === "Delivery") {
-                return properties.id || label;
-            }
-
-            if (label === "Receipt") {
+            if (
+                label === "ReliefRequest" ||
+                label === "Delivery" ||
+                label === "Receipt"
+            ) {
                 return properties.id || label;
             }
 
             if (label === "Warehouse") {
-                return "Warehouse";
+                return properties.name || "Warehouse";
             }
 
             if (label === "Supply") {
@@ -359,7 +523,7 @@ async function loadGraphEvidence() {
             }
 
             if (label === "Route") {
-                return "Route";
+                return properties.name || "Route";
             }
 
             if (label === "IncidentReport") {
@@ -369,8 +533,8 @@ async function loadGraphEvidence() {
             return label;
         }
 
-        // Draw relationship lines before nodes so they appear underneath.
-        data.relationships.forEach((relationship, index) => {
+        // Draw relationship lines before nodes.
+        data.relationships.forEach(relationship => {
             const source = nodeById.get(relationship.source);
             const target = nodeById.get(relationship.target);
 
@@ -419,6 +583,7 @@ async function loadGraphEvidence() {
         const arrow = document.createElementNS(svgNS, "path");
         arrow.setAttribute("d", "M0,0 L0,6 L6,3 z");
         arrow.setAttribute("fill", "#94a3b8");
+
         marker.appendChild(arrow);
         defs.appendChild(marker);
         svg.prepend(defs);
@@ -433,6 +598,7 @@ async function loadGraphEvidence() {
 
             const [x, y] = position;
             const group = document.createElementNS(svgNS, "g");
+
             group.setAttribute("class", "graph-node");
             group.setAttribute("tabindex", "0");
             group.setAttribute("role", "button");
@@ -522,10 +688,9 @@ async function loadGraphEvidence() {
 
                         const otherNode = nodeById.get(otherId);
                         const item = document.createElement("li");
+
                         const direction =
-                            relationship.source === node.id
-                                ? "→"
-                                : "←";
+                            relationship.source === node.id ? "→" : "←";
 
                         item.textContent =
                             `${relationship.type} ${direction} ` +
@@ -539,6 +704,7 @@ async function loadGraphEvidence() {
             }
 
             group.addEventListener("click", showDetails);
+
             group.addEventListener("keydown", event => {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();

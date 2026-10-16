@@ -1,4 +1,3 @@
-
 from falkordb import FalkorDB
 
 
@@ -41,9 +40,19 @@ def get_investigation():
     row = result.result_set[0]
 
     (
-        community, request_id, item, requested, delivery_id,
-        reported, confirmed, route, route_status, incident,
-        incident_status, warehouse, stock
+        community,
+        request_id,
+        item,
+        requested,
+        delivery_id,
+        reported,
+        confirmed,
+        route,
+        route_status,
+        incident,
+        incident_status,
+        warehouse,
+        stock
     ) = row
 
     gap = (
@@ -163,6 +172,223 @@ def get_investigation():
             f"recorded kits at {warehouse}."
         )
 
+  
+
+    cross_centre_query = """
+    MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest)
+          -[:FULFILLED_BY]->(d:Delivery)
+          -[:HAS_RECEIPT]->(rec:Receipt)
+
+    RETURN
+        c.name AS centre,
+        c.location AS location,
+        r.id AS request_id,
+        r.item AS item,
+        r.quantity AS requested,
+        d.id AS delivery_id,
+        d.reported_quantity AS reported,
+        rec.confirmed_quantity AS confirmed
+    ORDER BY c.name, r.id
+    """
+
+    cross_centre_result = graph.query(cross_centre_query)
+
+    cross_centre_findings = []
+    cross_centre_actions = []
+
+
+    records_by_item = {}
+
+    for record in cross_centre_result.result_set:
+        (
+            centre,
+            location,
+            centre_request_id,
+            centre_item,
+            centre_requested,
+            centre_delivery_id,
+            centre_reported,
+            centre_confirmed
+        ) = record
+
+        if not centre_item or centre_requested is None:
+            continue
+
+        records_by_item.setdefault(centre_item, []).append({
+            "centre": centre,
+            "location": location,
+            "request_id": centre_request_id,
+            "item": centre_item,
+            "requested": centre_requested,
+            "delivery_id": centre_delivery_id,
+            "reported": centre_reported,
+            "confirmed": centre_confirmed
+        })
+
+    for compared_item, centre_records in records_by_item.items():
+        if len(centre_records) < 2:
+            continue
+
+     
+
+        for centre_record in centre_records:
+            centre_name = centre_record["centre"]
+            centre_requested = centre_record["requested"]
+            centre_confirmed = centre_record["confirmed"]
+            centre_reported = centre_record["reported"]
+
+            if centre_confirmed is None:
+                cross_centre_findings.append({
+                    "title": "Cross-centre evidence incomplete",
+                    "centre": centre_name,
+                    "item": compared_item,
+                    "request_id": centre_record["request_id"],
+                    "finding": (
+                        f"{centre_name} has no receipt-confirmed quantity "
+                        f"for {compared_item} in the available records."
+                    ),
+                    "status": "Unverified",
+                    "next_step": (
+                        "Obtain and verify receipt or handover records "
+                        "before comparing quantities."
+                    )
+                })
+                continue
+
+            variance = centre_confirmed - centre_requested
+
+            if variance > 0:
+                cross_centre_findings.append({
+                    "title": "Confirmed quantity exceeds request",
+                    "centre": centre_name,
+                    "item": compared_item,
+                    "request_id": centre_record["request_id"],
+                    "requested_quantity": centre_requested,
+                    "reported_quantity": centre_reported,
+                    "confirmed_quantity": centre_confirmed,
+                    "variance": variance,
+                    "finding": (
+                        f"{centre_name} has {variance} more {compared_item} "
+                        "receipt-confirmed than its recorded request."
+                    ),
+                    "status": "Requires verification",
+                    "next_step": (
+                        "Check request amendments, duplicate records, "
+                        "additional allocations, and current physical stock."
+                    )
+                })
+
+            elif variance < 0:
+                shortfall = abs(variance)
+
+                cross_centre_findings.append({
+                    "title": "Confirmed quantity below request",
+                    "centre": centre_name,
+                    "item": compared_item,
+                    "request_id": centre_record["request_id"],
+                    "requested_quantity": centre_requested,
+                    "reported_quantity": centre_reported,
+                    "confirmed_quantity": centre_confirmed,
+                    "variance": variance,
+                    "finding": (
+                        f"{centre_name} has {shortfall} fewer "
+                        f"{compared_item} receipt-confirmed than requested."
+                    ),
+                    "status": "Requires verification",
+                    "next_step": (
+                        "Verify outstanding deliveries, receipts, "
+                        "allocations, and unmet demand."
+                    )
+                })
+
+            if (
+                centre_reported is not None
+                and centre_confirmed is not None
+                and centre_reported > centre_confirmed
+            ):
+                delivery_gap = centre_reported - centre_confirmed
+
+                cross_centre_findings.append({
+                    "title": "Reported delivery exceeds confirmed receipt",
+                    "centre": centre_name,
+                    "item": compared_item,
+                    "request_id": centre_record["request_id"],
+                    "reported_quantity": centre_reported,
+                    "confirmed_quantity": centre_confirmed,
+                    "variance": delivery_gap,
+                    "finding": (
+                        f"{delivery_gap} {compared_item} reported delivered "
+                        f"to {centre_name} are not confirmed by its receipt."
+                    ),
+                    "status": "Unresolved",
+                    "next_step": (
+                        "Request additional receipts or handover records."
+                    )
+                })
+
+
+
+        demo_centre_names = {"Centre A", "Centre B"}
+
+        demo_centre_records = [
+            record for record in centre_records
+            if record["centre"] in demo_centre_names
+        ]
+
+        above_request = [
+            record for record in demo_centre_records
+            if record["confirmed"] is not None
+            and record["confirmed"] > record["requested"]
+        ]
+
+        below_request = [
+            record for record in demo_centre_records
+            if record["confirmed"] is not None
+            and record["confirmed"] < record["requested"]
+        ]
+
+        if above_request and below_request:
+            for higher in above_request:
+                for lower in below_request:
+                    cross_centre_findings.append({
+                        "title": "Potential cross-centre allocation imbalance",
+                        "item": compared_item,
+                        "centres": [
+                            higher["centre"],
+                            lower["centre"]
+                        ],
+                        "finding": (
+                            f"{higher['centre']} has a confirmed quantity "
+                            "above its recorded request, while "
+                            f"{lower['centre']} has a confirmed quantity "
+                            "below its recorded request."
+                        ),
+                        "status": "Investigation lead only",
+                        "next_step": (
+                            "Verify current stock, outstanding obligations, "
+                            "request amendments, and transfer authority at "
+                            "both centres. Do not assume the excess is "
+                            "available or transferable."
+                        )
+                    })
+
+                    cross_centre_actions.append(
+                        f"Verify the records and current availability of "
+                        f"{compared_item} at {higher['centre']} and "
+                        f"{lower['centre']} before considering any "
+                        "reallocation."
+                    )
+
+    if cross_centre_findings:
+        cross_centre_actions.extend([
+            "Reconcile each centre's original request, delivery record, "
+            "and receipt independently.",
+            "Check for amended requests, duplicate records, and outstanding "
+            "deliveries before concluding that an imbalance exists."
+        ])
+
+ 
+
     return {
         "case_id": request_id,
         "community": community,
@@ -193,5 +419,7 @@ def get_investigation():
         "leads": leads,
         "leads_to_investigate": leads,
         "recommended_actions": recommended_actions,
+        "cross_centre_findings": cross_centre_findings,
+        "cross_centre_actions": cross_centre_actions,
         "ai_generated": False
     }

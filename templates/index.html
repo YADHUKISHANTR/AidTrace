@@ -41,6 +41,8 @@
         </div>
 
         {% if case %}
+
+        <!-- MAIN INVESTIGATION -->
         <section class="case-section">
             <div class="section-heading">
                 <div>
@@ -57,25 +59,33 @@
             <div class="metrics">
                 <div class="metric">
                     <span class="metric-label">Quantity requested</span>
-                    <strong id="requested-quantity">{{ case.requested }}</strong>
+                    <strong id="requested-quantity">
+                        {{ case.requested }}
+                    </strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric">
                     <span class="metric-label">Reported delivered</span>
-                    <strong id="reported-quantity">{{ case.reported }}</strong>
+                    <strong id="reported-quantity">
+                        {{ case.reported }}
+                    </strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric">
                     <span class="metric-label">Receipt confirmed</span>
-                    <strong id="confirmed-quantity">{{ case.confirmed }}</strong>
+                    <strong id="confirmed-quantity">
+                        {{ case.confirmed }}
+                    </strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric discrepancy-metric">
                     <span class="metric-label">Not yet confirmed</span>
-                    <strong id="unconfirmed-quantity">{{ case.gap }}</strong>
+                    <strong id="unconfirmed-quantity">
+                        {{ case.gap }}
+                    </strong>
                     <span class="metric-unit">kits</span>
                 </div>
             </div>
@@ -89,6 +99,7 @@
             </p>
         </section>
 
+        <!-- ORIGINAL EVIDENCE TRAIL -->
         <section class="content-section">
             <div class="section-heading">
                 <div>
@@ -163,6 +174,7 @@
             </div>
         </section>
 
+        <!-- ORIGINAL RECOMMENDED ACTIONS -->
         <section class="content-section">
             <div class="section-heading">
                 <div>
@@ -197,7 +209,9 @@
 
             <div class="evidence-control">
                 <label for="route-status-select">
-                    <span id="route-control-name">{{ case.route or "Transport route" }}</span>
+                    <span id="route-control-name">
+                        {{ case.route or "Transport route" }}
+                    </span>
                     status
                 </label>
 
@@ -231,11 +245,147 @@
             ></p>
         </section>
 
-        <!-- New Gemini AI investigation section -->
+        <!-- NEW: CROSS-CENTRE DISCREPANCY DETECTION -->
+        <section class="content-section" id="cross-centre-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">03 / CONNECTED INVESTIGATION</p>
+                    <h2>Cross-centre discrepancy detection</h2>
+                    <p class="page-description">
+                        Compare request records with receipt-confirmed
+                        quantities across relief centres to identify
+                        discrepancies requiring verification.
+                    </p>
+                </div>
+                <span class="section-count">
+                    {{ case.cross_centre_findings | length }} findings
+                </span>
+            </div>
+
+            <p class="notice">
+                <strong>Investigation leads, not proof of misallocation.</strong>
+                These comparisons use the quantities recorded in the graph.
+                They do not establish physical stock availability, wrongdoing,
+                or authority to transfer supplies between centres.
+            </p>
+
+            {% if case.cross_centre_findings %}
+                <div class="cross-centre-findings" id="cross-centre-findings">
+
+                    {% for finding in case.cross_centre_findings %}
+                    <article class="evidence-row cross-centre-finding">
+                        <div class="evidence-index">
+                            {{ "%02d" | format(loop.index) }}
+                        </div>
+
+                        <div class="evidence-content">
+                            <h3>{{ finding.title }}</h3>
+
+                            {% if finding.centre %}
+                            <p>
+                                <strong>Centre:</strong>
+                                {{ finding.centre }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.centres %}
+                            <p>
+                                <strong>Centres compared:</strong>
+                                {{ finding.centres | join(" ↔ ") }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.item %}
+                            <p>
+                                <strong>Item:</strong>
+                                {{ finding.item }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.request_id %}
+                            <p>
+                                <strong>Request reference:</strong>
+                                {{ finding.request_id }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.requested_quantity is defined %}
+                            <p>
+                                <strong>Requested:</strong>
+                                {{ finding.requested_quantity }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.reported_quantity is defined
+                                  and finding.reported_quantity is not none %}
+                            <p>
+                                <strong>Reported delivered:</strong>
+                                {{ finding.reported_quantity }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.confirmed_quantity is defined
+                                  and finding.confirmed_quantity is not none %}
+                            <p>
+                                <strong>Receipt-confirmed:</strong>
+                                {{ finding.confirmed_quantity }}
+                            </p>
+                            {% endif %}
+
+                            {% if finding.finding %}
+                            <p>{{ finding.finding }}</p>
+                            {% endif %}
+
+                            {% if finding.next_step %}
+                            <p>
+                                <strong>Verification step:</strong>
+                                {{ finding.next_step }}
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <span class="tag">
+                            {{ finding.status }}
+                        </span>
+                    </article>
+                    {% endfor %}
+
+                </div>
+            {% else %}
+                <p class="investigation-status">
+                    No cross-centre discrepancy findings were returned
+                    by the current graph query.
+                </p>
+            {% endif %}
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">VERIFICATION CHECKLIST</p>
+                    <h2>Cross-centre follow-up actions</h2>
+                </div>
+            </div>
+
+            {% if case.cross_centre_actions %}
+            <ol class="action-list" id="cross-centre-actions">
+                {% for action in case.cross_centre_actions %}
+                <li>
+                    <span class="action-number">{{ loop.index }}</span>
+                    <p>{{ action }}</p>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p>
+                No additional cross-centre actions were generated.
+            </p>
+            {% endif %}
+        </section>
+
+        <!-- ORIGINAL GEMINI AI INVESTIGATION -->
         <section class="content-section" id="ai-investigation-section">
             <div class="section-heading">
                 <div>
-                    <p class="eyebrow">03 / AI-ASSISTED REVIEW</p>
+                    <p class="eyebrow">04 / AI-ASSISTED REVIEW</p>
                     <h2>AI investigation</h2>
                     <p class="page-description">
                         Generate an evidence-grounded analysis of the
@@ -266,99 +416,114 @@
                 aria-live="polite"
             ></p>
 
-            
-                <div id="ai-analysis" hidden>
-                    <div class="notice">
-                        <strong>AI-assisted assessment — human review required.</strong>
-                        AI-generated explanations are hypotheses, not verified facts.
-                        The underlying records and evidence should be checked before
-                        taking action.
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Summary</h3>
-                        <p id="ai-summary"></p>
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Evidence assessment</h3>
-                        <p id="ai-evidence-assessment"></p>
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Possible explanations</h3>
-                        <ul id="ai-possible-explanations"></ul>
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Recommended actions</h3>
-                        <ol id="ai-recommended-actions"></ol>
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Confidence</h3>
-                        <p id="ai-confidence"></p>
-                        <p class="ai-secondary-text">
-                            This is the model's qualitative assessment,
-                            not a statistically calibrated probability.
-                        </p>
-                    </div>
-
-                    <div class="ai-result-item">
-                        <h3>Limitations</h3>
-                        <ul id="ai-limitations"></ul>
-                    </div>
+            <div id="ai-analysis" hidden>
+                <div class="notice">
+                    <strong>
+                        AI-assisted assessment — human review required.
+                    </strong>
+                    AI-generated explanations are hypotheses, not verified
+                    facts. The underlying records and evidence should be
+                    checked before taking action.
                 </div>
-                </section>
 
-              {% else %}
-            <section class="panel">
-                <h2>No investigation found</h2>
-                <p>
-                    No matching request, delivery, and receipt were found
-                    in the connected graph.
-                </p>
-            </section>
-        {% endif %}
-        
-            <section id="graph-explorer-section" class="panel">
-                <div class="section-heading">
-                    <p class="eyebrow">04 / CONNECTED DATA</p>
-                    <h2>Graph Evidence Explorer</h2>
-                    <p>
-                        Explore the actual records and relationships stored in FalkorDB.
-                        Select a node to inspect its recorded properties.
+                <div class="ai-result-item">
+                    <h3>Summary</h3>
+                    <p id="ai-summary"></p>
+                </div>
+
+                <div class="ai-result-item">
+                    <h3>Evidence assessment</h3>
+                    <p id="ai-evidence-assessment"></p>
+                </div>
+
+                <div class="ai-result-item">
+                    <h3>Possible explanations</h3>
+                    <ul id="ai-possible-explanations"></ul>
+                </div>
+
+                <div class="ai-result-item">
+                    <h3>Recommended actions</h3>
+                    <ol id="ai-recommended-actions"></ol>
+                </div>
+
+                <div class="ai-result-item">
+                    <h3>Confidence</h3>
+                    <p id="ai-confidence"></p>
+                    <p class="ai-secondary-text">
+                        This is the model's qualitative assessment,
+                        not a statistically calibrated probability.
                     </p>
                 </div>
 
-                <div class="graph-summary">
-                    <span><strong id="graph-node-count">—</strong> nodes</span>
-                    <span><strong id="graph-relationship-count">—</strong> relationships</span>
+                <div class="ai-result-item">
+                    <h3>Limitations</h3>
+                    <ul id="ai-limitations"></ul>
                 </div>
+            </div>
+        </section>
 
-                <p id="graph-explorer-status" role="status">
-                    Loading graph evidence…
-                </p>
+        {% else %}
+        <section class="panel">
+            <h2>No investigation found</h2>
+            <p>
+                No matching request, delivery, and receipt were found
+                in the connected graph.
+            </p>
+        </section>
+        {% endif %}
 
-                <div class="graph-explorer-layout">
-                    <div id="graph-visualization"
-                        class="graph-visualization"
-                        aria-label="Interactive graph of relief evidence">
-                    </div>
-
-                    <aside id="graph-node-details" class="graph-node-details">
-                        <h3>Select a node</h3>
-                        <p>Its recorded properties will appear here.</p>
-                    </aside>
+        <!-- ORIGINAL GRAPH EVIDENCE EXPLORER -->
+        <section id="graph-explorer-section" class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">05 / CONNECTED DATA</p>
+                    <h2>Graph Evidence Explorer</h2>
+                    <p>
+                        Explore the actual records and relationships stored
+                        in FalkorDB. Select a node to inspect its recorded
+                        properties.
+                    </p>
                 </div>
+            </div>
 
-                <p class="graph-disclaimer">
-                    Graph records represent stored data, not independent proof that
-                    physical deliveries or warehouse stock have been verified.
-                    The incident report in this demonstration is simulated.
-                </p>
-            </section>
+            <div class="graph-summary">
+                <span>
+                    <strong id="graph-node-count">—</strong> nodes
+                </span>
+                <span>
+                    <strong id="graph-relationship-count">—</strong>
+                    relationships
+                </span>
+            </div>
 
+            <p id="graph-explorer-status" role="status">
+                Loading graph evidence…
+            </p>
+
+            <div class="graph-explorer-layout">
+                <div
+                    id="graph-visualization"
+                    class="graph-visualization"
+                    aria-label="Interactive graph of relief evidence"
+                ></div>
+
+                <aside
+                    id="graph-node-details"
+                    class="graph-node-details"
+                >
+                    <h3>Select a node</h3>
+                    <p>
+                        Its recorded properties will appear here.
+                    </p>
+                </aside>
+            </div>
+
+            <p class="graph-disclaimer">
+                Graph records represent stored data, not independent proof
+                that physical deliveries or warehouse stock have been verified.
+                The incident report in this demonstration is simulated.
+            </p>
+        </section>
 
         <footer class="page-footer">
             <span>AidTrace</span>

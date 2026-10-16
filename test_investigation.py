@@ -40,6 +40,40 @@ def fake_investigation(
     }
 
 
+def fake_cross_centre_findings():
+    """Synthetic cross-centre findings for isolated tests."""
+    return [
+        {
+            "title": "Confirmed quantity exceeds request",
+            "centre": "Centre A",
+            "item": "Water kits",
+            "requested_quantity": 100,
+            "confirmed_quantity": 140,
+            "variance": 40,
+            "status": "Requires verification"
+        },
+        {
+            "title": "Confirmed quantity below request",
+            "centre": "Centre B",
+            "item": "Water kits",
+            "requested_quantity": 100,
+            "confirmed_quantity": 60,
+            "variance": -40,
+            "status": "Requires verification"
+        },
+        {
+            "title": "Potential cross-centre allocation imbalance",
+            "item": "Water kits",
+            "centres": ["Centre A", "Centre B"],
+            "status": "Investigation lead only",
+            "next_step": (
+                "Verify current stock and transfer authority. "
+                "Do not assume the excess is available or transferable."
+            )
+        }
+    ]
+
+
 def test_unconfirmed_quantity_is_50(monkeypatch):
     monkeypatch.setattr(
         investigation,
@@ -79,3 +113,59 @@ def test_missing_investigation_is_handled(monkeypatch):
     )
 
     assert investigation.get_investigation() is None
+
+
+def test_centre_a_excess_is_40():
+    findings = fake_cross_centre_findings()
+
+    centre_a = next(
+        finding for finding in findings
+        if finding.get("centre") == "Centre A"
+    )
+
+    assert centre_a["variance"] == 40
+    assert centre_a["confirmed_quantity"] == 140
+    assert centre_a["status"] == "Requires verification"
+
+
+def test_centre_b_shortfall_is_40():
+    findings = fake_cross_centre_findings()
+
+    centre_b = next(
+        finding for finding in findings
+        if finding.get("centre") == "Centre B"
+    )
+
+    assert centre_b["variance"] == -40
+    assert centre_b["confirmed_quantity"] == 60
+    assert centre_b["status"] == "Requires verification"
+
+
+def test_allocation_imbalance_is_not_transfer_authority():
+    findings = fake_cross_centre_findings()
+
+    imbalance = next(
+        finding for finding in findings
+        if finding["title"] == "Potential cross-centre allocation imbalance"
+    )
+
+    assert imbalance["status"] == "Investigation lead only"
+    assert "Do not assume" in imbalance["next_step"]
+    assert "transfer authority" in imbalance["next_step"]
+
+
+def test_original_case_and_cross_centre_findings_are_separate():
+    original_case = fake_investigation()
+    cross_centre_findings = fake_cross_centre_findings()
+
+    assert original_case["case_id"] == "REQ-001"
+    assert original_case["gap"] == 50
+
+    assert any(
+        finding.get("centre") == "Centre A"
+        for finding in cross_centre_findings
+    )
+    assert any(
+        finding.get("centre") == "Centre B"
+        for finding in cross_centre_findings
+    )
