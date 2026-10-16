@@ -514,3 +514,49 @@ button:disabled {
     font-size: 13px;
     color: #526052;
 }
+
+/* AI results: full-width text layout */
+#ai-investigation-section #ai-analysis {
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+
+#ai-investigation-section .ai-result-item {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 17px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+#ai-investigation-section .ai-result-item h3 {
+    margin: 0 0 8px;
+}
+
+#ai-investigation-section .ai-result-item p,
+#ai-investigation-section .ai-result-item li {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+#ai-investigation-section .ai-result-item p {
+    margin-bottom: 8px;
+}
+
+#ai-investigation-section .ai-result-item ul,
+#ai-investigation-section .ai-result-item ol {
+    padding-left: 24px;
+    margin: 8px 0 0;
+}
+
+#ai-investigation-section .ai-result-item li {
+    margin-bottom: 8px;
+}
+
+#ai-investigation-section .ai-secondary-text {
+    color: var(--muted);
+    font-size: 13px;
+}

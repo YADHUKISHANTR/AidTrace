@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +24,6 @@
                 <span class="brand-mark">AT</span>
                 <span>AidTrace</span>
             </a>
-
             <span class="header-label">RELIEF INVESTIGATION</span>
         </div>
     </header>
@@ -231,8 +231,86 @@
             ></p>
         </section>
 
-        {% else %}
-        <section class="empty-state">
+        <!-- New Gemini AI investigation section -->
+        <section class="content-section" id="ai-investigation-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">03 / AI-ASSISTED REVIEW</p>
+                    <h2>AI investigation</h2>
+                    <p class="page-description">
+                        Generate an evidence-grounded analysis of the
+                        current investigation using Gemini.
+                    </p>
+                </div>
+            </div>
+
+            <div class="investigation-controls">
+                <div>
+                    <h3>Analyze the evidence</h3>
+                    <p>
+                        Review the discrepancy, possible explanations,
+                        and practical follow-up actions.
+                    </p>
+                </div>
+
+                <button id="run-ai-investigation" type="button">
+                    Run AI investigation
+                    <span aria-hidden="true">→</span>
+                </button>
+            </div>
+
+            <p
+                id="ai-investigation-status"
+                class="investigation-status"
+                role="status"
+                aria-live="polite"
+            ></p>
+
+            
+                <div id="ai-analysis" hidden>
+                    <div class="notice">
+                        <strong>AI-assisted assessment — human review required.</strong>
+                        AI-generated explanations are hypotheses, not verified facts.
+                        The underlying records and evidence should be checked before
+                        taking action.
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Summary</h3>
+                        <p id="ai-summary"></p>
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Evidence assessment</h3>
+                        <p id="ai-evidence-assessment"></p>
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Possible explanations</h3>
+                        <ul id="ai-possible-explanations"></ul>
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Recommended actions</h3>
+                        <ol id="ai-recommended-actions"></ol>
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Confidence</h3>
+                        <p id="ai-confidence"></p>
+                        <p class="ai-secondary-text">
+                            This is the model's qualitative assessment,
+                            not a statistically calibrated probability.
+                        </p>
+                    </div>
+
+                    <div class="ai-result-item">
+                        <h3>Limitations</h3>
+                        <ul id="ai-limitations"></ul>
+                    </div>
+                </div>
+                </section>
+
             <h2>No investigation found</h2>
             <p>
                 No matching request, delivery, and receipt were found

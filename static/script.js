@@ -4,6 +4,13 @@ const investigationStatus = document.getElementById("investigation-status");
 const routeSelect = document.getElementById("route-status-select");
 const updateRouteButton = document.getElementById("update-route-button");
 const routeUpdateStatus = document.getElementById("route-update-status");
+
+const runAIButton = document.getElementById("run-ai-investigation");
+const aiInvestigationStatus = document.getElementById("ai-investigation-status");
+const aiAnalysisContainer = document.getElementById("ai-analysis");
+
+let aiAnalysisNeedsRefresh = false;
+
 function updateText(id, value) {
     const element = document.getElementById(id);
 
@@ -82,6 +89,92 @@ function renderInvestigation(result) {
     renderActions(result.recommended_actions || []);
 }
 
+function renderAIList(id, items) {
+    const list = document.getElementById(id);
+
+    if (!list) return;
+
+    list.replaceChildren();
+
+    if (!Array.isArray(items) || items.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "No items provided.";
+        list.appendChild(item);
+        return;
+    }
+
+    items.forEach((value) => {
+        const item = document.createElement("li");
+        item.textContent = String(value);
+        list.appendChild(item);
+    });
+}
+
+function renderAIAnalysis(analysis) {
+    updateText("ai-summary", analysis.summary);
+    updateText("ai-evidence-assessment", analysis.evidence_assessment);
+    updateText("ai-confidence", analysis.confidence);
+
+    renderAIList(
+        "ai-possible-explanations",
+        analysis.possible_explanations
+    );
+
+    renderAIList(
+        "ai-recommended-actions",
+        analysis.recommended_actions
+    );
+
+    renderAIList("ai-limitations", analysis.limitations);
+
+    if (aiAnalysisContainer) {
+        aiAnalysisContainer.hidden = false;
+    }
+
+    aiAnalysisNeedsRefresh = false;
+}
+
+async function runAIInvestigation() {
+    if (!runAIButton || !aiInvestigationStatus) return;
+
+    runAIButton.disabled = true;
+    aiInvestigationStatus.textContent =
+        "Analyzing current graph evidence with Gemini. This may take a little while...";
+
+    try {
+        const response = await fetch("/api/ai-investigate", {
+            method: "POST"
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error || "AI investigation failed."
+            );
+        }
+
+        if (!result.ai_analysis) {
+            throw new Error("The server returned no AI analysis.");
+        }
+
+        renderAIAnalysis(result.ai_analysis);
+
+        aiInvestigationStatus.textContent =
+            "AI analysis complete. Review the findings and verify all hypotheses against the evidence.";
+
+    } catch (error) {
+        aiInvestigationStatus.textContent =
+            `${error.message} You can try again.`;
+    } finally {
+        runAIButton.disabled = false;
+    }
+}
+
+if (runAIButton) {
+    runAIButton.addEventListener("click", runAIInvestigation);
+}
+
 if (runButton && investigationStatus) {
     runButton.addEventListener("click", async () => {
         runButton.disabled = true;
@@ -99,6 +192,18 @@ if (runButton && investigationStatus) {
             }
 
             renderInvestigation(result);
+
+            // Existing AI output may no longer match the current graph.
+            aiAnalysisNeedsRefresh = true;
+
+            if (aiAnalysisContainer) {
+                aiAnalysisContainer.hidden = true;
+            }
+
+            if (aiInvestigationStatus) {
+                aiInvestigationStatus.textContent =
+                    "Graph evidence refreshed. Run AI investigation to generate an updated analysis.";
+            }
 
             investigationStatus.textContent =
                 `Investigation complete. ${result.gap} kits remain unconfirmed. ` +
@@ -138,6 +243,17 @@ if (routeSelect && updateRouteButton && routeUpdateStatus) {
             updateText("route-status", result.route_status);
 
             routeSelect.value = result.route_status;
+
+            aiAnalysisNeedsRefresh = true;
+
+            if (aiAnalysisContainer) {
+                aiAnalysisContainer.hidden = true;
+            }
+
+            if (aiInvestigationStatus) {
+                aiInvestigationStatus.textContent =
+                    "Route status changed. Run the AI investigation again to refresh its analysis.";
+            }
 
             routeUpdateStatus.textContent =
                 `${result.route} status updated to ${result.route_status}.`;

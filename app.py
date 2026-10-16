@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, jsonify
 from falkordb import FalkorDB
 from investigation import get_investigation
+from ai_investigator import generate_ai_analysis
 
 app = Flask(__name__)
 
@@ -33,6 +34,33 @@ def investigate():
         app.logger.exception("Investigation failed")
         return jsonify({
             "error": "Investigation failed. Check the server terminal."
+        }), 500
+
+
+@app.route("/api/ai-investigate", methods=["POST"])
+def ai_investigate():
+    try:
+        case = get_investigation()
+
+        if case is None:
+            return jsonify({
+                "error": "No matching investigation found."
+            }), 404
+
+        analysis = generate_ai_analysis(case)
+
+        return jsonify({
+            "case_id": case.get("case_id"),
+            "ai_analysis": analysis
+        })
+
+    except Exception:
+        app.logger.exception("AI investigation failed")
+        return jsonify({
+            "error": (
+                "AI investigation failed. "
+                "Check the server terminal and try again."
+            )
         }), 500
 
 
@@ -72,8 +100,10 @@ def update_route():
     except Exception:
         app.logger.exception("Route update failed")
         return jsonify({
-            "error": "Could not update route status. "
-                     "Check the server terminal."
+            "error": (
+                "Could not update route status. "
+                "Check the server terminal."
+            )
         }), 500
 
 
