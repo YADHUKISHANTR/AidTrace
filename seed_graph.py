@@ -1,14 +1,14 @@
-
 from falkordb import FalkorDB
 
-# Connect to the local database
 db = FalkorDB(host="localhost", port=6379)
 graph = db.select_graph("aidtrace")
 
-# Create the community
 graph.query("""
-MERGE (c:Community {name: 'Greenfield'})
-SET c.location = 'Demo Region'
+MATCH (c:Community)-[:HAS_REQUEST]->(
+    r:ReliefRequest {id: 'REQ-001'}
+)
+SET c.name = 'Wayanad',
+    c.location = 'Wayanad, Kerala'
 
 MERGE (r:ReliefRequest {id: 'REQ-001'})
 SET r.item = 'Water kits',
@@ -28,9 +28,8 @@ MERGE (r)-[:FULFILLED_BY]->(d)
 MERGE (d)-[:HAS_RECEIPT]->(rec)
 """)
 
-print("AidTrace demo graph created successfully!")
+print("AidTrace Wayanad demo graph created successfully!")
 
-# Check what was stored
 result = graph.query("""
 MATCH (n)
 RETURN labels(n) AS type, n

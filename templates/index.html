@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,6 +85,7 @@
                 The difference between the reported delivery and the
                 available receipt evidence needs further investigation.
                 It does not establish that supplies were lost or never delivered.
+                All incident details in this demonstration are simulated.
             </p>
         </section>
 
@@ -172,22 +172,12 @@
             </div>
 
             <ol class="action-list" id="recommended-actions">
+                {% for action in case.recommended_actions %}
                 <li>
-                    <span class="action-number">1</span>
-                    <p>Request additional receipt or handover evidence.</p>
+                    <span class="action-number">{{ loop.index }}</span>
+                    <p>{{ action }}</p>
                 </li>
-                <li>
-                    <span class="action-number">2</span>
-                    <p>Ask the delivery organisation to reconcile the reported quantity.</p>
-                </li>
-                <li>
-                    <span class="action-number">3</span>
-                    <p>Check whether the route disruption affected this delivery.</p>
-                </li>
-                <li>
-                    <span class="action-number">4</span>
-                    <p>Verify whether recorded warehouse stock is available and unallocated.</p>
-                </li>
+                {% endfor %}
             </ol>
 
             <div class="investigation-controls">
@@ -207,7 +197,8 @@
 
             <div class="evidence-control">
                 <label for="route-status-select">
-                    North Access Road status
+                    <span id="route-control-name">{{ case.route or "Transport route" }}</span>
+                    status
                 </label>
 
                 <select id="route-status-select">

@@ -1,4 +1,3 @@
-
 from falkordb import FalkorDB
 
 db = FalkorDB(host="localhost", port=6379)
@@ -52,11 +51,20 @@ for row in result.result_set:
 
     print("\n--- Investigation assessment ---")
     if route_status == "Disrupted":
-        print("A route disruption is recorded. Investigate whether it affected this delivery.")
+        print(
+            "A simulated route disruption is recorded. "
+            "Investigate whether it affected this delivery."
+        )
     else:
         print("No disrupted route is confirmed in the connected evidence.")
 
     if stock is not None and stock > 0:
-        print("Potential stock is recorded. Verify its allocation and delivery feasibility.")
+        print(
+            "Potential stock is recorded. Verify its allocation "
+            "and delivery feasibility."
+        )
 
-    print("The discrepancy remains unresolved until further evidence is checked.")
+    print(
+        "The discrepancy remains unresolved until further "
+        "evidence is checked."
+    )

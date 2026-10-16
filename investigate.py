@@ -23,7 +23,7 @@ RETURN
 
 result = graph.query(query)
 
-# Display the investigation result
+# Display stuff
 for row in result.result_set:
     community, item, requested, reported, confirmed, unconfirmed = row
 
