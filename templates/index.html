@@ -59,33 +59,25 @@
             <div class="metrics">
                 <div class="metric">
                     <span class="metric-label">Quantity requested</span>
-                    <strong id="requested-quantity">
-                        {{ case.requested }}
-                    </strong>
+                    <strong id="requested-quantity">{{ case.requested }}</strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric">
                     <span class="metric-label">Reported delivered</span>
-                    <strong id="reported-quantity">
-                        {{ case.reported }}
-                    </strong>
+                    <strong id="reported-quantity">{{ case.reported }}</strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric">
                     <span class="metric-label">Receipt confirmed</span>
-                    <strong id="confirmed-quantity">
-                        {{ case.confirmed }}
-                    </strong>
+                    <strong id="confirmed-quantity">{{ case.confirmed }}</strong>
                     <span class="metric-unit">kits</span>
                 </div>
 
                 <div class="metric discrepancy-metric">
                     <span class="metric-label">Not yet confirmed</span>
-                    <strong id="unconfirmed-quantity">
-                        {{ case.gap }}
-                    </strong>
+                    <strong id="unconfirmed-quantity">{{ case.gap }}</strong>
                     <span class="metric-unit">kits</span>
                 </div>
             </div>
@@ -99,14 +91,14 @@
             </p>
         </section>
 
-        <!-- ORIGINAL EVIDENCE TRAIL -->
+        <!-- EVIDENCE TRAIL -->
         <section class="content-section">
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">01 / RECORDS</p>
                     <h2>Evidence trail</h2>
                 </div>
-                <span class="section-count">5 fields</span>
+                <span class="section-count">5 evidence types</span>
             </div>
 
             <div class="evidence-list">
@@ -116,6 +108,12 @@
                         <h3>Delivery record</h3>
                         <p id="delivery-description">
                             {{ case.reported }} kits reported as delivered.
+                        </p>
+                        <p class="record-reference">
+                            Record reference:
+                            <strong id="delivery-reference">
+                                {{ case.delivery_id or "Unavailable" }}
+                            </strong>
                         </p>
                     </div>
                     <span class="evidence-value" id="delivery-value">
@@ -129,6 +127,12 @@
                         <h3>Receipt record</h3>
                         <p id="receipt-description">
                             Quantity confirmed by the available receipt.
+                        </p>
+                        <p class="record-reference">
+                            Record reference:
+                            <strong id="receipt-reference">
+                                {{ case.receipt_id or "Unavailable" }}
+                            </strong>
                         </p>
                     </div>
                     <span class="evidence-value" id="receipt-value">
@@ -156,6 +160,13 @@
                         <p id="incident-description">
                             {{ case.incident or "No connected incident report found." }}
                         </p>
+                        <p class="record-reference">
+                            {% if case.incident_is_simulated %}
+                                Simulated demonstration evidence
+                            {% else %}
+                                Incident details require independent verification
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
 
@@ -166,6 +177,9 @@
                         <p id="warehouse-name">
                             {{ case.warehouse or "No connected warehouse found" }}
                         </p>
+                        <p class="record-reference">
+                            Recorded quantity; physical availability unverified
+                        </p>
                     </div>
                     <span class="evidence-value" id="warehouse-stock">
                         {{ case.stock if case.stock is not none else "Unknown" }}{% if case.stock is not none %} kits{% endif %}
@@ -174,7 +188,7 @@
             </div>
         </section>
 
-        <!-- ORIGINAL RECOMMENDED ACTIONS -->
+        <!-- RECOMMENDED ACTIONS -->
         <section class="content-section">
             <div class="section-heading">
                 <div>
@@ -230,22 +244,118 @@
                     Update route status
                 </button>
 
-                <p
-                    id="route-update-status"
-                    role="status"
-                    aria-live="polite"
-                ></p>
+                <p id="route-update-status" role="status" aria-live="polite"></p>
             </div>
 
-            <p
-                id="investigation-status"
-                class="investigation-status"
-                role="status"
-                aria-live="polite"
-            ></p>
+            <p id="investigation-status"
+               class="investigation-status"
+               role="status"
+               aria-live="polite"></p>
         </section>
 
-        <!-- NEW: CROSS-CENTRE DISCREPANCY DETECTION -->
+        <!-- EVIDENCE-BACKED ACTION PLANS -->
+        <section class="content-section" id="action-plans-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">ACTION PLANS / HUMAN REVIEW</p>
+                    <h2>Evidence-backed action plans</h2>
+                    <p class="page-description">
+                        Each action connects an investigation finding to
+                        its supporting records and the checks needed before
+                        anyone takes further action.
+                    </p>
+                </div>
+
+                <span class="section-count">
+                    {{ case.action_plans | length }} action plans
+                </span>
+            </div>
+
+            <p class="notice">
+                <strong>Human approval required.</strong>
+                These plans guide investigation; they do not authorize
+                transfers, confirm physical stock, or establish wrongdoing.
+            </p>
+
+            {% if case.action_plans %}
+            <div class="action-plan-list">
+                {% for plan in case.action_plans %}
+                <article class="evidence-row action-plan-card"
+                         id="action-plan-{{ plan.id | lower }}">
+
+                    <div class="evidence-index">
+                        {{ "%02d" | format(loop.index) }}
+                    </div>
+
+                    <div class="evidence-content">
+                        <p class="eyebrow">{{ plan.id }}</p>
+                        <h3>{{ plan.title }}</h3>
+
+                        <p>{{ plan.reason }}</p>
+
+                        <p>
+                            <strong>Priority:</strong>
+                            {{ plan.priority }}
+                        </p>
+
+                        <p>
+                            <strong>Review status:</strong>
+                            {{ plan.status }}
+                        </p>
+
+                        <div class="action-plan-evidence">
+                            <h4>Supporting evidence references</h4>
+
+                            {% if plan.evidence_references %}
+                            <ul>
+                                {% for reference in plan.evidence_references %}
+                                <li>
+                                    <code>{{ reference }}</code>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p>
+                                No specific record reference is available
+                                for this action. Locate and verify the
+                                relevant source record before proceeding.
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <div class="action-plan-checklist">
+                            <h4>Verification checklist</h4>
+                            <ol>
+                                {% for step in plan.verification_steps %}
+                                <li>{{ step }}</li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+
+                        <p class="record-reference">
+                            {% if plan.requires_human_review %}
+                                Requires human review
+                            {% endif %}
+                            {% if plan.automatically_authorized %}
+                                · Automatically authorized
+                            {% else %}
+                                · Not automatically authorized
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <span class="tag">{{ plan.priority }}</span>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="investigation-status">
+                No action plans were generated for the current investigation.
+            </p>
+            {% endif %}
+        </section>
+
+        <!-- CROSS-CENTRE DISCREPANCY DETECTION -->
         <section class="content-section" id="cross-centre-section">
             <div class="section-heading">
                 <div>
@@ -270,92 +380,82 @@
             </p>
 
             {% if case.cross_centre_findings %}
-                <div class="cross-centre-findings" id="cross-centre-findings">
+            <div class="cross-centre-findings" id="cross-centre-findings">
+                {% for finding in case.cross_centre_findings %}
+                <article class="evidence-row cross-centre-finding">
+                    <div class="evidence-index">
+                        {{ "%02d" | format(loop.index) }}
+                    </div>
 
-                    {% for finding in case.cross_centre_findings %}
-                    <article class="evidence-row cross-centre-finding">
-                        <div class="evidence-index">
-                            {{ "%02d" | format(loop.index) }}
-                        </div>
+                    <div class="evidence-content">
+                        <h3>{{ finding.title }}</h3>
 
-                        <div class="evidence-content">
-                            <h3>{{ finding.title }}</h3>
+                        {% if finding.centre %}
+                        <p><strong>Centre:</strong> {{ finding.centre }}</p>
+                        {% endif %}
 
-                            {% if finding.centre %}
-                            <p>
-                                <strong>Centre:</strong>
-                                {{ finding.centre }}
-                            </p>
-                            {% endif %}
+                        {% if finding.centres %}
+                        <p>
+                            <strong>Centres compared:</strong>
+                            {{ finding.centres | join(" ↔ ") }}
+                        </p>
+                        {% endif %}
 
-                            {% if finding.centres %}
-                            <p>
-                                <strong>Centres compared:</strong>
-                                {{ finding.centres | join(" ↔ ") }}
-                            </p>
-                            {% endif %}
+                        {% if finding.item %}
+                        <p><strong>Item:</strong> {{ finding.item }}</p>
+                        {% endif %}
 
-                            {% if finding.item %}
-                            <p>
-                                <strong>Item:</strong>
-                                {{ finding.item }}
-                            </p>
-                            {% endif %}
+                        {% if finding.request_id %}
+                        <p>
+                            <strong>Request reference:</strong>
+                            {{ finding.request_id }}
+                        </p>
+                        {% endif %}
 
-                            {% if finding.request_id %}
-                            <p>
-                                <strong>Request reference:</strong>
-                                {{ finding.request_id }}
-                            </p>
-                            {% endif %}
+                        {% if finding.requested_quantity is defined %}
+                        <p>
+                            <strong>Requested:</strong>
+                            {{ finding.requested_quantity }}
+                        </p>
+                        {% endif %}
 
-                            {% if finding.requested_quantity is defined %}
-                            <p>
-                                <strong>Requested:</strong>
-                                {{ finding.requested_quantity }}
-                            </p>
-                            {% endif %}
+                        {% if finding.reported_quantity is defined
+                              and finding.reported_quantity is not none %}
+                        <p>
+                            <strong>Reported delivered:</strong>
+                            {{ finding.reported_quantity }}
+                        </p>
+                        {% endif %}
 
-                            {% if finding.reported_quantity is defined
-                                  and finding.reported_quantity is not none %}
-                            <p>
-                                <strong>Reported delivered:</strong>
-                                {{ finding.reported_quantity }}
-                            </p>
-                            {% endif %}
+                        {% if finding.confirmed_quantity is defined
+                              and finding.confirmed_quantity is not none %}
+                        <p>
+                            <strong>Receipt-confirmed:</strong>
+                            {{ finding.confirmed_quantity }}
+                        </p>
+                        {% endif %}
 
-                            {% if finding.confirmed_quantity is defined
-                                  and finding.confirmed_quantity is not none %}
-                            <p>
-                                <strong>Receipt-confirmed:</strong>
-                                {{ finding.confirmed_quantity }}
-                            </p>
-                            {% endif %}
+                        {% if finding.finding %}
+                        <p>{{ finding.finding }}</p>
+                        {% endif %}
 
-                            {% if finding.finding %}
-                            <p>{{ finding.finding }}</p>
-                            {% endif %}
+                        {% if finding.next_step %}
+                        <p>
+                            <strong>Verification step:</strong>
+                            {{ finding.next_step }}
+                        </p>
+                        {% endif %}
+                    </div>
 
-                            {% if finding.next_step %}
-                            <p>
-                                <strong>Verification step:</strong>
-                                {{ finding.next_step }}
-                            </p>
-                            {% endif %}
-                        </div>
-
-                        <span class="tag">
-                            {{ finding.status }}
-                        </span>
-                    </article>
-                    {% endfor %}
-
-                </div>
+                    <span class="tag">{{ finding.status }}</span>
+                </article>
+                {% endfor %}
+            </div>
             {% else %}
-                <p class="investigation-status">
-                    No cross-centre discrepancy findings were returned
-                    by the current graph query.
-                </p>
+            <p class="investigation-status">
+                No cross-centre discrepancy findings were returned
+                by the current graph query.
+            </p>
             {% endif %}
 
             <div class="section-heading">
@@ -375,17 +475,130 @@
                 {% endfor %}
             </ol>
             {% else %}
-            <p>
-                No additional cross-centre actions were generated.
-            </p>
+            <p>No additional cross-centre actions were generated.</p>
             {% endif %}
         </section>
 
-        <!-- ORIGINAL GEMINI AI INVESTIGATION -->
+        <!-- RESOURCE AVAILABILITY AND SHORTAGE MATCHING -->
+        <section class="content-section" id="resource-matching-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">04 / RESOURCE COORDINATION</p>
+                    <h2>Resource availability &amp; shortage matching</h2>
+                    <p class="page-description">
+                        Identify recorded warehouse stock that may match
+                        unmet demand across relief centres.
+                    </p>
+                </div>
+                <span class="section-count" id="resource-match-count">
+                    {{ case.resource_matches | length }} potential matches
+                </span>
+            </div>
+
+            <p class="notice" id="resource-matching-note">
+                <strong>Potential matches, not allocations.</strong>
+                {{ case.resource_matching_note }}
+            </p>
+
+            <div id="resource-matches">
+                {% if case.resource_matches %}
+                {% for match in case.resource_matches %}
+                <article class="evidence-row resource-match">
+                    <div class="evidence-index">
+                        {{ "%02d" | format(loop.index) }}
+                    </div>
+
+                    <div class="evidence-content">
+                        <h3>{{ match.centre }} — {{ match.item }}</h3>
+                        <p><strong>Request:</strong> {{ match.request_id }}</p>
+                        <p>
+                            <strong>Recorded shortfall:</strong>
+                            {{ match.recorded_shortfall }}
+                        </p>
+                        <p>
+                            <strong>Potential match:</strong>
+                            {{ match.potential_match_quantity }}
+                        </p>
+                        <p>
+                            <strong>Remaining unmatched:</strong>
+                            {{ match.remaining_unmatched_quantity }}
+                        </p>
+
+                        {% for warehouse in match.candidate_warehouses %}
+                        <p>
+                            <strong>Candidate warehouse:</strong>
+                            {{ warehouse.warehouse }}
+                        </p>
+                        <p>
+                            <strong>Recorded stock:</strong>
+                            {{ warehouse.recorded_stock_quantity }}
+                        </p>
+                        {% endfor %}
+
+                        <p><strong>Next step:</strong> {{ match.next_step }}</p>
+                    </div>
+
+                    <span class="tag">{{ match.status }}</span>
+                </article>
+                {% endfor %}
+                {% else %}
+                <p class="investigation-status">
+                    No potential resource matches were found in the
+                    current graph records.
+                </p>
+                {% endif %}
+            </div>
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">UNMET DEMAND</p>
+                    <h2>Remaining unmatched quantities</h2>
+                </div>
+            </div>
+
+            <div id="unmatched-resource-demand">
+                {% if case.unmatched_demand %}
+                {% for demand in case.unmatched_demand %}
+                <article class="evidence-row unmatched-demand">
+                    <div class="evidence-index">
+                        {{ "%02d" | format(loop.index) }}
+                    </div>
+
+                    <div class="evidence-content">
+                        <h3>{{ demand.centre }} — {{ demand.item }}</h3>
+                        <p><strong>Request:</strong> {{ demand.request_id }}</p>
+                        <p>
+                            <strong>Unmatched quantity:</strong>
+                            {{ demand.unmatched_quantity }}
+                        </p>
+                    </div>
+
+                    <span class="tag">{{ demand.status }}</span>
+                </article>
+                {% endfor %}
+                {% else %}
+                <p class="investigation-status">
+                    No unmatched demand was returned by the current
+                    resource-matching query.
+                </p>
+                {% endif %}
+            </div>
+
+            <p class="graph-disclaimer">
+                Stock quantities are taken from synthetic demonstration
+                records and have not been physically verified. The same
+                stock may appear as a candidate for multiple centres;
+                potential matches must not be added together. Check existing
+                commitments, item condition, transport feasibility, and
+                transfer authority before making allocation decisions.
+            </p>
+        </section>
+
+        <!-- AI INVESTIGATION -->
         <section class="content-section" id="ai-investigation-section">
             <div class="section-heading">
                 <div>
-                    <p class="eyebrow">04 / AI-ASSISTED REVIEW</p>
+                    <p class="eyebrow">05 / AI-ASSISTED REVIEW</p>
                     <h2>AI investigation</h2>
                     <p class="page-description">
                         Generate an evidence-grounded analysis of the
@@ -409,12 +622,10 @@
                 </button>
             </div>
 
-            <p
-                id="ai-investigation-status"
-                class="investigation-status"
-                role="status"
-                aria-live="polite"
-            ></p>
+            <p id="ai-investigation-status"
+               class="investigation-status"
+               role="status"
+               aria-live="polite"></p>
 
             <div id="ai-analysis" hidden>
                 <div class="notice">
@@ -472,11 +683,11 @@
         </section>
         {% endif %}
 
-        <!-- ORIGINAL GRAPH EVIDENCE EXPLORER -->
+        <!-- GRAPH EVIDENCE EXPLORER -->
         <section id="graph-explorer-section" class="panel">
             <div class="section-heading">
                 <div>
-                    <p class="eyebrow">05 / CONNECTED DATA</p>
+                    <p class="eyebrow">06 / CONNECTED DATA</p>
                     <h2>Graph Evidence Explorer</h2>
                     <p>
                         Explore the actual records and relationships stored
@@ -501,20 +712,13 @@
             </p>
 
             <div class="graph-explorer-layout">
-                <div
-                    id="graph-visualization"
-                    class="graph-visualization"
-                    aria-label="Interactive graph of relief evidence"
-                ></div>
+                <div id="graph-visualization"
+                     class="graph-visualization"
+                     aria-label="Interactive graph of relief evidence"></div>
 
-                <aside
-                    id="graph-node-details"
-                    class="graph-node-details"
-                >
+                <aside id="graph-node-details" class="graph-node-details">
                     <h3>Select a node</h3>
-                    <p>
-                        Its recorded properties will appear here.
-                    </p>
+                    <p>Its recorded properties will appear here.</p>
                 </aside>
             </div>
 

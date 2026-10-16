@@ -198,6 +198,129 @@ function renderCrossCentreFindings(findings, actions) {
     }
 }
 
+
+function renderResourceMatching(result) {
+    const matchesContainer = document.getElementById("resource-matches");
+    const unmatchedContainer = document.getElementById("unmatched-resource-demand");
+    const note = document.getElementById("resource-matching-note");
+    const section = document.getElementById("resource-matching-section");
+
+    if (!section) return;
+
+    if (note) {
+        note.textContent = result.resource_matching_note ||
+            "Resource matches are planning leads only. Verify stock, commitments, and transfer authority.";
+    }
+
+    const matches = Array.isArray(result.resource_matches)
+        ? result.resource_matches
+        : [];
+
+    const unmatched = Array.isArray(result.unmatched_demand)
+        ? result.unmatched_demand
+        : [];
+
+    const count = section.querySelector(".section-count");
+
+    if (count) {
+        count.textContent = `${matches.length} potential matches`;
+    }
+
+    if (matchesContainer) {
+        matchesContainer.replaceChildren();
+
+        if (matches.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "No potential resource matches were returned.";
+            matchesContainer.appendChild(empty);
+        }
+
+        matches.forEach((match, index) => {
+            const article = document.createElement("article");
+            article.className = "evidence-row resource-match";
+
+            const number = document.createElement("div");
+            number.className = "evidence-index";
+            number.textContent = String(index + 1).padStart(2, "0");
+
+            const content = document.createElement("div");
+            content.className = "evidence-content";
+
+            const heading = document.createElement("h3");
+            heading.textContent = `${match.centre || "Unknown centre"} — ${match.item || "Unknown item"}`;
+            content.appendChild(heading);
+
+            const addDetail = (label, value) => {
+                if (value === null || value === undefined || value === "") return;
+
+                const paragraph = document.createElement("p");
+                const strong = document.createElement("strong");
+                strong.textContent = `${label}: `;
+                paragraph.append(strong, document.createTextNode(String(value)));
+                content.appendChild(paragraph);
+            };
+
+            addDetail("Request", match.request_id);
+            addDetail("Recorded shortfall", match.recorded_shortfall);
+            addDetail("Potential match", match.potential_match_quantity);
+            addDetail("Remaining unmatched", match.remaining_unmatched_quantity);
+
+            (match.candidate_warehouses || []).forEach(warehouse => {
+                addDetail("Candidate warehouse", warehouse.warehouse);
+                addDetail("Recorded stock", warehouse.recorded_stock_quantity);
+            });
+
+            addDetail("Next step", match.next_step);
+
+            const status = document.createElement("span");
+            status.className = "tag";
+            status.textContent = match.status || "Requires verification";
+
+            article.append(number, content, status);
+            matchesContainer.appendChild(article);
+        });
+    }
+
+    if (unmatchedContainer) {
+        unmatchedContainer.replaceChildren();
+
+        if (unmatched.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "No remaining unmatched quantities were returned.";
+            unmatchedContainer.appendChild(empty);
+        }
+
+        unmatched.forEach((item, index) => {
+            const article = document.createElement("article");
+            article.className = "evidence-row";
+
+            const number = document.createElement("div");
+            number.className = "evidence-index";
+            number.textContent = String(index + 1).padStart(2, "0");
+
+            const content = document.createElement("div");
+            content.className = "evidence-content";
+
+            const heading = document.createElement("h3");
+            heading.textContent = `${item.centre || "Unknown centre"} — ${item.item || "Unknown item"}`;
+
+            const request = document.createElement("p");
+            request.textContent = `Request: ${item.request_id || "Unknown"}`;
+
+            const quantity = document.createElement("p");
+            quantity.textContent = `Unmatched quantity: ${item.unmatched_quantity ?? "Unknown"}`;
+
+            const status = document.createElement("p");
+            status.textContent = item.status || "Further verification required";
+
+            content.append(heading, request, quantity, status);
+            article.append(number, content);
+            unmatchedContainer.appendChild(article);
+        });
+    }
+}
+
+
 function renderInvestigation(result) {
     updateText("requested-quantity", result.requested);
     updateText("reported-quantity", result.reported);
@@ -247,6 +370,7 @@ function renderInvestigation(result) {
         result.cross_centre_findings || [],
         result.cross_centre_actions || []
     );
+    renderResourceMatching(result);
 }
 
 function renderAIList(id, items) {
