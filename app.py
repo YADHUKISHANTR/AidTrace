@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, jsonify
 from falkordb import FalkorDB
 from investigation import get_investigation
 from ai_investigator import generate_ai_analysis
+from graph_explorer import get_graph_evidence
 
 app = Flask(__name__)
 
@@ -106,6 +107,18 @@ def update_route():
             )
         }), 500
 
+@app.route("/api/graph-evidence", methods=["GET"])
+def graph_evidence():
+    try:
+        data = get_graph_evidence()
+        return jsonify(data)
+
+    except Exception:
+        app.logger.exception("Graph evidence retrieval failed")
+        return jsonify({
+            "error": "Could not retrieve graph evidence. "
+                     "Check the server terminal."
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

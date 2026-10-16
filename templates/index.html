@@ -311,13 +311,54 @@
                 </div>
                 </section>
 
-            <h2>No investigation found</h2>
-            <p>
-                No matching request, delivery, and receipt were found
-                in the connected graph.
-            </p>
-        </section>
+              {% else %}
+            <section class="panel">
+                <h2>No investigation found</h2>
+                <p>
+                    No matching request, delivery, and receipt were found
+                    in the connected graph.
+                </p>
+            </section>
         {% endif %}
+        
+            <section id="graph-explorer-section" class="panel">
+                <div class="section-heading">
+                    <p class="eyebrow">04 / CONNECTED DATA</p>
+                    <h2>Graph Evidence Explorer</h2>
+                    <p>
+                        Explore the actual records and relationships stored in FalkorDB.
+                        Select a node to inspect its recorded properties.
+                    </p>
+                </div>
+
+                <div class="graph-summary">
+                    <span><strong id="graph-node-count">—</strong> nodes</span>
+                    <span><strong id="graph-relationship-count">—</strong> relationships</span>
+                </div>
+
+                <p id="graph-explorer-status" role="status">
+                    Loading graph evidence…
+                </p>
+
+                <div class="graph-explorer-layout">
+                    <div id="graph-visualization"
+                        class="graph-visualization"
+                        aria-label="Interactive graph of relief evidence">
+                    </div>
+
+                    <aside id="graph-node-details" class="graph-node-details">
+                        <h3>Select a node</h3>
+                        <p>Its recorded properties will appear here.</p>
+                    </aside>
+                </div>
+
+                <p class="graph-disclaimer">
+                    Graph records represent stored data, not independent proof that
+                    physical deliveries or warehouse stock have been verified.
+                    The incident report in this demonstration is simulated.
+                </p>
+            </section>
+
 
         <footer class="page-footer">
             <span>AidTrace</span>

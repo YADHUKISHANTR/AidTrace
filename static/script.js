@@ -265,3 +265,307 @@ if (routeSelect && updateRouteButton && routeUpdateStatus) {
         }
     });
 }
+
+async function loadGraphEvidence() {
+    const status = document.getElementById("graph-explorer-status");
+    const visualization = document.getElementById("graph-visualization");
+    const details = document.getElementById("graph-node-details");
+    const nodeCount = document.getElementById("graph-node-count");
+    const relationshipCount = document.getElementById(
+        "graph-relationship-count"
+    );
+
+    if (!status || !visualization || !details) {
+        return;
+    }
+
+    status.textContent = "Loading graph evidence…";
+
+    try {
+        const response = await fetch("/api/graph-evidence");
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || "Could not load graph evidence.");
+        }
+
+        nodeCount.textContent = data.node_count;
+        relationshipCount.textContent = data.relationship_count;
+
+        visualization.replaceChildren();
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const width = 900;
+        const height = 560;
+
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.setAttribute("role", "img");
+        svg.setAttribute(
+            "aria-label",
+            "Connected relief investigation evidence graph"
+        );
+
+        const positions = {
+            Community: [110, 130],
+            ReliefRequest: [310, 130],
+            Delivery: [510, 130],
+            Receipt: [740, 130],
+            Route: [510, 330],
+            IncidentReport: [740, 430],
+            Warehouse: [110, 390],
+            Supply: [310, 390]
+        };
+
+        const colors = {
+            Community: "#2563eb",
+            ReliefRequest: "#7c3aed",
+            Delivery: "#0f766e",
+            Receipt: "#15803d",
+            Route: "#b45309",
+            IncidentReport: "#b91c1c",
+            Warehouse: "#475569",
+            Supply: "#64748b"
+        };
+
+        const nodeById = new Map(
+            data.nodes.map(node => [node.id, node])
+        );
+
+        const nodeElements = new Map();
+
+        function getLabel(node) {
+            const label = node.labels?.[0] || "Node";
+            const properties = node.properties || {};
+
+            if (label === "Community") {
+                return properties.name || label;
+            }
+
+            if (label === "ReliefRequest" || label === "Delivery") {
+                return properties.id || label;
+            }
+
+            if (label === "Receipt") {
+                return properties.id || label;
+            }
+
+            if (label === "Warehouse") {
+                return "Warehouse";
+            }
+
+            if (label === "Supply") {
+                return properties.item || label;
+            }
+
+            if (label === "Route") {
+                return "Route";
+            }
+
+            if (label === "IncidentReport") {
+                return "Simulated incident";
+            }
+
+            return label;
+        }
+
+        // Draw relationship lines before nodes so they appear underneath.
+        data.relationships.forEach((relationship, index) => {
+            const source = nodeById.get(relationship.source);
+            const target = nodeById.get(relationship.target);
+
+            if (!source || !target) {
+                return;
+            }
+
+            const sourcePosition = positions[source.labels?.[0]];
+            const targetPosition = positions[target.labels?.[0]];
+
+            if (!sourcePosition || !targetPosition) {
+                return;
+            }
+
+            const [x1, y1] = sourcePosition;
+            const [x2, y2] = targetPosition;
+
+            const line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "#94a3b8");
+            line.setAttribute("stroke-width", "2");
+            line.setAttribute("marker-end", "url(#graph-arrow)");
+            svg.appendChild(line);
+
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("x", (x1 + x2) / 2);
+            text.setAttribute("y", (y1 + y2) / 2 - 9);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("class", "graph-edge-label");
+            text.textContent = relationship.type;
+            svg.appendChild(text);
+        });
+
+        const defs = document.createElementNS(svgNS, "defs");
+        const marker = document.createElementNS(svgNS, "marker");
+        marker.setAttribute("id", "graph-arrow");
+        marker.setAttribute("markerWidth", "8");
+        marker.setAttribute("markerHeight", "8");
+        marker.setAttribute("refX", "6");
+        marker.setAttribute("refY", "3");
+        marker.setAttribute("orient", "auto");
+
+        const arrow = document.createElementNS(svgNS, "path");
+        arrow.setAttribute("d", "M0,0 L0,6 L6,3 z");
+        arrow.setAttribute("fill", "#94a3b8");
+        marker.appendChild(arrow);
+        defs.appendChild(marker);
+        svg.prepend(defs);
+
+        data.nodes.forEach(node => {
+            const label = node.labels?.[0] || "Node";
+            const position = positions[label];
+
+            if (!position) {
+                return;
+            }
+
+            const [x, y] = position;
+            const group = document.createElementNS(svgNS, "g");
+            group.setAttribute("class", "graph-node");
+            group.setAttribute("tabindex", "0");
+            group.setAttribute("role", "button");
+            group.setAttribute(
+                "aria-label",
+                `Inspect ${label}: ${getLabel(node)}`
+            );
+
+            const rect = document.createElementNS(svgNS, "rect");
+            rect.setAttribute("x", x - 72);
+            rect.setAttribute("y", y - 27);
+            rect.setAttribute("width", "144");
+            rect.setAttribute("height", "54");
+            rect.setAttribute("rx", "10");
+            rect.setAttribute("fill", colors[label] || "#475569");
+
+            const title = document.createElementNS(svgNS, "text");
+            title.setAttribute("x", x);
+            title.setAttribute("y", y + 5);
+            title.setAttribute("text-anchor", "middle");
+            title.setAttribute("class", "graph-node-label");
+            title.textContent = getLabel(node);
+
+            group.append(rect, title);
+
+            function showDetails() {
+                details.replaceChildren();
+
+                const heading = document.createElement("h3");
+                heading.textContent = label;
+
+                const name = document.createElement("p");
+                name.textContent = getLabel(node);
+
+                details.append(heading, name);
+
+                if (label === "IncidentReport") {
+                    const warning = document.createElement("p");
+                    warning.className = "graph-simulated-warning";
+                    warning.textContent =
+                        "SIMULATED DEMO DATA — not evidence of a real incident.";
+                    details.appendChild(warning);
+                }
+
+                const propertiesHeading = document.createElement("h4");
+                propertiesHeading.textContent = "Recorded properties";
+                details.appendChild(propertiesHeading);
+
+                const list = document.createElement("dl");
+
+                Object.entries(node.properties || {}).forEach(
+                    ([key, value]) => {
+                        const term = document.createElement("dt");
+                        term.textContent = key;
+
+                        const description = document.createElement("dd");
+                        description.textContent = String(value);
+
+                        list.append(term, description);
+                    }
+                );
+
+                details.appendChild(list);
+
+                const connectedHeading = document.createElement("h4");
+                connectedHeading.textContent = "Connected relationships";
+                details.appendChild(connectedHeading);
+
+                const connected = data.relationships.filter(
+                    relationship =>
+                        relationship.source === node.id ||
+                        relationship.target === node.id
+                );
+
+                if (connected.length === 0) {
+                    const empty = document.createElement("p");
+                    empty.textContent = "No connected relationships.";
+                    details.appendChild(empty);
+                } else {
+                    const relationshipList = document.createElement("ul");
+
+                    connected.forEach(relationship => {
+                        const otherId =
+                            relationship.source === node.id
+                                ? relationship.target
+                                : relationship.source;
+
+                        const otherNode = nodeById.get(otherId);
+                        const item = document.createElement("li");
+                        const direction =
+                            relationship.source === node.id
+                                ? "→"
+                                : "←";
+
+                        item.textContent =
+                            `${relationship.type} ${direction} ` +
+                            `${otherNode ? getLabel(otherNode) : otherId}`;
+
+                        relationshipList.appendChild(item);
+                    });
+
+                    details.appendChild(relationshipList);
+                }
+            }
+
+            group.addEventListener("click", showDetails);
+            group.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    showDetails();
+                }
+            });
+
+            svg.appendChild(group);
+            nodeElements.set(node.id, group);
+        });
+
+        visualization.appendChild(svg);
+        status.textContent = "Graph evidence loaded successfully.";
+
+        if (data.nodes.length > 0) {
+            const firstNode = data.nodes[0];
+            const firstElement = nodeElements.get(firstNode.id);
+
+            if (firstElement) {
+                firstElement.dispatchEvent(new Event("click"));
+            }
+        }
+    } catch (error) {
+        console.error("Graph evidence loading failed:", error);
+        status.textContent =
+            "Could not load graph evidence. Check the Flask terminal.";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadGraphEvidence);

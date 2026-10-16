@@ -560,3 +560,118 @@ button:disabled {
     color: var(--muted);
     font-size: 13px;
 }
+
+.graph-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.graph-summary span {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 10px;
+}
+
+.graph-explorer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.graph-visualization {
+    min-width: 0;
+    overflow-x: auto;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 12px;
+    background: var(--card-background, #ffffff);
+}
+
+.graph-visualization svg {
+    display: block;
+    width: 100%;
+    min-width: 700px;
+    height: auto;
+}
+
+.graph-node {
+    cursor: pointer;
+    outline: none;
+}
+
+.graph-node rect {
+    stroke: transparent;
+    stroke-width: 3;
+    transition: stroke 0.15s ease;
+}
+
+.graph-node:hover rect,
+.graph-node:focus rect {
+    stroke: #f59e0b;
+}
+
+.graph-node-label {
+    fill: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.graph-edge-label {
+    fill: var(--text-color, #334155);
+    font-size: 10px;
+    font-weight: 600;
+    paint-order: stroke;
+    stroke: var(--card-background, #ffffff);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+}
+
+.graph-node-details {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 12px;
+    overflow-wrap: anywhere;
+}
+
+.graph-node-details dl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+}
+
+.graph-node-details dt {
+    margin-top: 8px;
+    font-weight: 600;
+}
+
+.graph-node-details dd {
+    margin: 0;
+}
+
+.graph-node-details li {
+    margin-bottom: 8px;
+}
+
+.graph-simulated-warning {
+    padding: 10px;
+    border-radius: 8px;
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 600;
+}
+
+.graph-disclaimer {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+    .graph-explorer-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
