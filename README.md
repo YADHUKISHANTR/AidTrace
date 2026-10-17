@@ -195,9 +195,11 @@ AidTrace/
 └── requirements.txt          # Python dependencies
 ```
 
-## Graph Queries
+Graph Queries
 
-AidTrace uses Cypher queries to retrieve connected records and support its graph-based investigation workflow. These queries allow the application to trace relationships and examine potential inconsistencies across relief-distribution data.
+AidTrace uses Cypher queries to investigate connected relief-distribution records, trace evidence, identify potential discrepancies, and support resource matching through FalkorDB.
+
+For details about the graph data model, Cypher queries, and investigation logic, see [Cypher Queries and Graph Algorithms](docs/CYPHER_QUERIES.md).
 
 ## AI Disclosure
 
