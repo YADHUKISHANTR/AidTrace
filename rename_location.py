@@ -4,7 +4,6 @@ from falkordb import FalkorDB
 db = FalkorDB(host="localhost", port=6379)
 graph = db.select_graph("aidtrace")
 
-# Rename the existing community without creating a duplicate.
 graph.query("""
 MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest {id: 'REQ-001'})
 SET c.name = 'Wayanad',
@@ -30,7 +29,6 @@ SET incident.description =
     incident.status = 'Simulated'
 """)
 
-# Verify the changes.
 result = graph.query("""
 MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest {id: 'REQ-001'})
 OPTIONAL MATCH (d:Delivery {id: 'DEL-001'})-[:TRANSPORTED_VIA]->(route:Route)

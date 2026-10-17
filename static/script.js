@@ -418,7 +418,6 @@ function renderInvestigation(result) {
     renderActions(result.recommended_actions || []);
     renderCrossCentreFindings(result.cross_centre_findings || []);
 
-    // The backend returns these fields at the top level.
     renderResourceMatching({
         matches: result.resource_matches || [],
         unmatched_demand: result.unmatched_demand || [],
@@ -426,7 +425,6 @@ function renderInvestigation(result) {
     });
 
     // Action plans are already rendered by the Flask template.
-    // Do not append a second set of cards here.
 
     if (investigationStatus) {
         investigationStatus.textContent =
@@ -529,7 +527,6 @@ async function runInvestigation() {
 
                 await loadGraphEvidence();
 
-        // Scroll to the investigation results after they finish loading.
         const resultsSection =
             document.getElementById("action-plans-section");
 

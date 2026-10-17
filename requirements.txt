@@ -1,0 +1,5 @@
+Flask
+falkordb
+redis
+google-genai
+python-dotenv
