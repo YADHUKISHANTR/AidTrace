@@ -4,6 +4,7 @@ from falkordb import FalkorDB
 db = FalkorDB(host="localhost", port=6379)
 graph = db.select_graph("aidtrace")
 
+
 # --------------------------------------------------
 # SCENARIO 1: Wayanad, Kerala
 # Original investigation case.
@@ -35,6 +36,7 @@ MERGE (r)-[:FULFILLED_BY]->(d)
 MERGE (d)-[:HAS_RECEIPT]->(rec)
 """)
 
+
 # --------------------------------------------------
 # Wayanad supporting evidence
 # Synthetic demonstration records only.
@@ -43,15 +45,19 @@ MERGE (d)-[:HAS_RECEIPT]->(rec)
 graph.query("""
 MERGE (route:Route {id: 'ROUTE-001'})
 SET route.name = 'Relief delivery route',
-    route.status = 'Disrupted',
+    route.status = coalesce(route.status, 'Disrupted'),
     route.scenario_id = 'wayanad',
     route.synthetic_demo = true
 
 MERGE (incident:Incident {id: 'INCIDENT-001'})
-SET incident.description = 'Possible delivery delay requiring verification',
+SET incident.description =
+        'Possible delivery delay requiring verification',
     incident.status = 'Unverified lead',
     incident.scenario_id = 'wayanad',
     incident.synthetic_demo = true
+
+// Add the label expected by investigation.py.
+SET incident:IncidentReport
 
 MERGE (warehouse:Warehouse {id: 'WAREHOUSE-WAYANAD-001'})
 SET warehouse.name = 'Wayanad Relief Warehouse',
@@ -65,7 +71,16 @@ SET supply.item = 'Water kits',
     supply.synthetic_demo = true
 
 MERGE (warehouse)-[:STORES]->(supply)
+MERGE (incident)-[:AFFECTS]->(route)
+
+WITH route
+MATCH (d:Delivery {
+    id: 'DEL-001',
+    scenario_id: 'wayanad'
+})
+MERGE (d)-[:TRANSPORTED_VIA]->(route)
 """)
+
 
 # --------------------------------------------------
 # Wayanad cross-centre discrepancy demonstration
@@ -128,9 +143,11 @@ MERGE (requestB)-[:FULFILLED_BY]->(deliveryB)
 MERGE (deliveryB)-[:HAS_RECEIPT]->(receiptB)
 """)
 
+
 # --------------------------------------------------
 # SCENARIO 2: Assam river flooding
 # Synthetic demonstration data only.
+# Intentionally has no Route record.
 # --------------------------------------------------
 
 graph.query("""
@@ -175,14 +192,12 @@ MERGE (d)-[:HAS_RECEIPT]->(rec)
 MERGE (warehouse)-[:STORES]->(supply)
 """)
 
-print("AidTrace graph seeded successfully.")
-print("Wayanad scenario seeded.")
-print("Synthetic Wayanad cross-centre records added.")
-print("Synthetic Assam scenario seeded.")
 
 # --------------------------------------------------
 # VERIFY COMMUNITIES AND REQUESTS
 # --------------------------------------------------
+
+print("\\n=== Communities and requests ===")
 
 result = graph.query("""
 MATCH (c:Community)-[:HAS_REQUEST]->(r:ReliefRequest)
@@ -198,18 +213,87 @@ ORDER BY community_scenario, centre
 for row in result.result_set:
     print(row)
 
+
 # --------------------------------------------------
 # VERIFY SUPPORTING RECORDS
 # --------------------------------------------------
 
+print("\\n=== Supporting records ===")
+
 result = graph.query("""
 MATCH (n)
-WHERE n:Route OR n:Incident OR n:Warehouse OR n:Supply
+WHERE n:Route
+   OR n:Incident
+   OR n:IncidentReport
+   OR n:Warehouse
+   OR n:Supply
 RETURN labels(n) AS node_type,
        coalesce(n.name, n.id, n.description, n.item) AS record,
-       n.scenario_id AS scenario_id
+       n.scenario_id AS scenario_id,
+       n.status AS status
 ORDER BY scenario_id, node_type
 """)
 
 for row in result.result_set:
     print(row)
+
+
+# --------------------------------------------------
+# VERIFY WAYANAD DELIVERY-ROUTE CONNECTION
+# --------------------------------------------------
+
+print("\\n=== Wayanad delivery-route connection ===")
+
+result = graph.query("""
+MATCH (d:Delivery {
+    id: 'DEL-001',
+    scenario_id: 'wayanad'
+})-[:TRANSPORTED_VIA]->
+(r:Route {
+    id: 'ROUTE-001',
+    scenario_id: 'wayanad'
+})
+RETURN d.id AS delivery_id,
+       r.id AS route_id,
+       r.name AS route_name,
+       r.status AS route_status
+""")
+
+if result.result_set:
+    for row in result.result_set:
+        print(row)
+else:
+    print("ERROR: Wayanad delivery-route connection was not found.")
+
+
+# --------------------------------------------------
+# VERIFY INCIDENT-ROUTE CONNECTION
+# --------------------------------------------------
+
+print("\\n=== Wayanad incident-route connection ===")
+
+result = graph.query("""
+MATCH (i:IncidentReport {
+    id: 'INCIDENT-001',
+    scenario_id: 'wayanad'
+})-[:AFFECTS]->
+(r:Route {
+    id: 'ROUTE-001',
+    scenario_id: 'wayanad'
+})
+RETURN i.id AS incident_id,
+       i.status AS incident_status,
+       r.id AS route_id
+""")
+
+if result.result_set:
+    for row in result.result_set:
+        print(row)
+else:
+    print("ERROR: Wayanad incident-route connection was not found.")
+
+
+print("\\nAidTrace graph seeding and verification completed.")
+print("Wayanad scenario seeded.")
+print("Synthetic Wayanad cross-centre records added.")
+print("Synthetic Assam scenario seeded.")

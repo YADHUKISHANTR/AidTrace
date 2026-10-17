@@ -51,25 +51,39 @@ async function readResponse(response) {
     return data;
 }
 
+
 function renderActions(actions) {
     const container = document.getElementById("recommended-actions");
+
     if (!container) return;
 
-    container.replaceChildren();
-
+    
     if (!Array.isArray(actions) || actions.length === 0) {
-        const message = document.createElement("p");
-        message.textContent = "No recommended actions are available for this investigation.";
-        container.appendChild(message);
         return;
     }
 
+    container.replaceChildren();
+
     actions.forEach((action) => {
-        const item = document.createElement("div");
+        const item = document.createElement("li");
         item.className = "action-item";
 
+        if (typeof action === "string") {
+            const description = document.createElement("p");
+            description.textContent = action;
+            item.appendChild(description);
+            container.appendChild(item);
+            return;
+        }
+
+        // Also support structured actions if the API provides them.
+        if (!action || typeof action !== "object") {
+            return;
+        }
+
         const title = document.createElement("h4");
-        title.textContent = action.title || action.action || "Recommended action";
+        title.textContent =
+            action.title || action.action || "Recommended action";
         item.appendChild(title);
 
         const description = document.createElement("p");
@@ -77,11 +91,14 @@ function renderActions(actions) {
             action.description || action.reason || action.details || "";
         item.appendChild(description);
 
-        if (action.requires_human_review || action.automatically_authorized === false) {
-            const note = document.createElement("p");
-            note.className = "record-reference";
-            note.textContent = "Requires human review before action.";
-            item.appendChild(note);
+        if (
+            action.requires_human_review ||
+            action.automatically_authorized === false
+        ) {
+            const reviewNote = document.createElement("p");
+            reviewNote.className = "human-review-note";
+            reviewNote.textContent = "Requires human review";
+            item.appendChild(reviewNote);
         }
 
         container.appendChild(item);
@@ -98,6 +115,7 @@ function appendFindingDetail(container, label, value) {
 }
 
 
+
 function renderCrossCentreFindings(findings) {
     const container = document.getElementById("cross-centre-findings");
     const actionsContainer = document.getElementById("cross-centre-actions");
@@ -105,56 +123,115 @@ function renderCrossCentreFindings(findings) {
     if (!container) return;
 
     container.replaceChildren();
-    if (actionsContainer) actionsContainer.replaceChildren();
 
     if (!Array.isArray(findings) || findings.length === 0) {
         const message = document.createElement("p");
+        message.className = "investigation-status";
         message.textContent =
-            "No cross-centre findings were returned for this scenario.";
+            "No cross-centre discrepancy findings were returned by the current graph query.";
         container.appendChild(message);
         return;
     }
 
-    findings.forEach((finding) => {
-        const card = document.createElement("div");
-        card.className = "finding-card";
+    findings.forEach((finding, index) => {
+        const card = document.createElement("article");
+        card.className = "evidence-row cross-centre-finding";
 
-        const title = document.createElement("h4");
-        title.textContent =
-            finding.title || finding.type || "Cross-centre finding";
-        card.appendChild(title);
+        const number = document.createElement("div");
+        number.className = "evidence-index";
+        number.textContent = String(index + 1).padStart(2, "0");
+        card.appendChild(number);
 
-        appendFindingDetail(
-            card,
-            "Description",
+        const content = document.createElement("div");
+        content.className = "evidence-content";
+
+        const title = document.createElement("h3");
+        title.textContent = finding.title || finding.type || "Cross-centre finding";
+        content.appendChild(title);
+
+        function addDetail(label, value) {
+            if (value === undefined || value === null || value === "") return;
+
+            const paragraph = document.createElement("p");
+            const strong = document.createElement("strong");
+            strong.textContent = `${label}: `;
+            paragraph.appendChild(strong);
+            paragraph.appendChild(document.createTextNode(formatValue(value)));
+            content.appendChild(paragraph);
+        }
+
+        addDetail("Centre", finding.centre);
+
+        if (Array.isArray(finding.centres) && finding.centres.length) {
+            addDetail("Centres compared", finding.centres.join(" ↔ "));
+        }
+
+        addDetail("Item", finding.item);
+        addDetail("Request reference", finding.request_id);
+        addDetail("Requested", finding.requested_quantity);
+        addDetail("Reported delivered", finding.reported_quantity);
+        addDetail("Receipt-confirmed", finding.confirmed_quantity);
+
+        const description =
             finding.finding ||
             finding.description ||
-            finding.summary ||
-            "No finding description was provided."
+            finding.summary;
+
+        if (description) {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = description;
+            content.appendChild(paragraph);
+        }
+
+        addDetail(
+            "Verification step",
+            finding.next_step ||
+            finding.verification_step
         );
 
-        if (finding.evidence) {
-            appendFindingDetail(card, "Evidence", finding.evidence);
-        }
+        if (finding.evidence) addDetail("Evidence", finding.evidence);
+        if (finding.uncertainty) addDetail("Uncertainty", finding.uncertainty);
 
-        if (finding.uncertainty) {
-            appendFindingDetail(card, "Uncertainty", finding.uncertainty);
-        }
+        card.appendChild(content);
+
+        const status = document.createElement("span");
+        status.className = "tag";
+        status.textContent = finding.status || "Requires verification";
+        card.appendChild(status);
 
         container.appendChild(card);
+    });
 
-        if (actionsContainer && Array.isArray(finding.recommended_actions)) {
-            finding.recommended_actions.forEach((action) => {
-                const item = document.createElement("p");
-                item.textContent = typeof action === "string"
+    // Preserve the checklist from the existing HTML instead of clearing it
+    // and replacing it with a different list from the findings.
+    // If the API provides explicit cross-centre actions, use those.
+    if (actionsContainer) {
+        const actions = findings
+            .flatMap((finding) => finding.recommended_actions || [])
+            .filter(Boolean);
+
+        if (actions.length > 0) {
+            actionsContainer.replaceChildren();
+
+            actions.forEach((action, index) => {
+                const item = document.createElement("li");
+
+                const number = document.createElement("span");
+                number.className = "action-number";
+                number.textContent = String(index + 1);
+
+                const description = document.createElement("p");
+                description.textContent = typeof action === "string"
                     ? action
                     : action.title ||
                       action.description ||
                       JSON.stringify(action);
+
+                item.append(number, description);
                 actionsContainer.appendChild(item);
             });
         }
-    });
+    }
 }
 
 
@@ -450,7 +527,19 @@ async function runInvestigation() {
             investigationStatus.textContent = "Investigation complete.";
         }
 
-        await loadGraphEvidence();
+                await loadGraphEvidence();
+
+        // Scroll to the investigation results after they finish loading.
+        const resultsSection =
+            document.getElementById("action-plans-section");
+
+        if (resultsSection) {
+            resultsSection.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        }
+
     } catch (error) {
         if (investigationStatus) {
             investigationStatus.textContent = `Investigation failed: ${error.message}`;
