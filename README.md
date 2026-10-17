@@ -1,147 +1,64 @@
-# AidTrace — Graph-Powered Relief Investigation
+# AidTrace — Relief Investigation System
 
-AidTrace is a graph-powered relief investigation prototype built with **FalkorDB**, **Python/Flask**, and **Google Gemini**. It helps investigators explore connected relief-operation data, identify potential discrepancies, examine resource availability, and understand findings through AI-assisted explanations.
+AidTrace is a graph-powered relief investigation system that helps identify discrepancies in disaster-relief distribution, trace resources across connected records, investigate missing evidence, and understand potential supply-chain irregularities.
 
-The project demonstrates how graph relationships can support investigations involving relief requests, deliveries, receipts, routes, incidents, warehouses, and supplies.
-
-> **Project status:** Hackathon prototype. Findings are investigative leads that require verification; discrepancies alone do not prove fraud, theft, or misconduct.
-
-## Table of Contents
-
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [Architecture](#architecture)
-- [Graph Data Model](#graph-data-model)
-- [Prerequisites](#prerequisites)
-- [Installation and Setup](#installation-and-setup)
-- [Configure Environment Variables](#configure-environment-variables)
-- [Initialize the Graph Database](#initialize-the-graph-database)
-- [Run AidTrace](#run-aidtrace)
-- [Using the Application](#using-the-application)
-- [Cypher Queries and Graph Algorithms](#cypher-queries-and-graph-algorithms)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
-- [Demo Video](#demo-video)
-- [Hackathon Track](#hackathon-track)
-- [AI-Assisted Development Disclosure](#ai-assisted-development-disclosure)
-- [Limitations](#limitations)
+Built with **Python, Flask, FalkorDB, Cypher, and Google Gemini**, AidTrace connects relief requests, deliveries, receipts, routes, communities, warehouses, and supplies into a graph that investigators can explore.
 
 ## Features
 
-- **Graph-based investigation:** Examine connected relief requests, deliveries, receipts, routes, and related records.
-- **Delivery discrepancy analysis:** Compare reported delivery quantities with receipt-confirmed quantities where supporting records are available.
-- **Cross-centre findings:** Explore potential relationships and discrepancies across relief centres.
-- **Resource matching:** Identify supply records that may be relevant to outstanding relief needs.
-- **Route updates:** Record operational route-status changes through the application.
-- **AI-assisted investigation:** Use Google Gemini to help explain investigation findings.
-- **Graph evidence explorer:** Inspect graph nodes, properties, and relationships.
-- **Node editing:** Update supported node properties with a reason for the change.
-- **Multiple scenarios:** Explore the Wayanad and Assam River Flooding demonstration datasets.
-
-The exact findings depend on the records loaded into FalkorDB and the queries used by the application.
+- **Graph-based investigation:** Trace connected relief records and identify potential discrepancies.
+- **Evidence tracing:** Explore relationships between requests, deliveries, receipts, and routes.
+- **Cross-centre investigation:** Examine potential inconsistencies across relief distribution centres.
+- **Resource matching:** Help identify relief resources and distribution needs.
+- **Interactive graph explorer:** Inspect graph nodes and their relationships.
+- **Route updates:** Update route information with a recorded reason.
+- **Node updates:** Edit supported graph properties with a reason for the change.
+- **AI-assisted investigation:** Use Google Gemini to explain findings based on investigation evidence.
+- **Multiple scenarios:** Explore the Wayanad and Assam flood-relief scenarios.
 
 ## Technology Stack
 
-| Technology            | Purpose                                               |
-| --------------------- | ----------------------------------------------------- |
-| Python                | Backend implementation and investigation logic        |
-| Flask                 | Web application and API endpoints                     |
-| FalkorDB              | Graph database for connected relief-operation records |
-| Cypher                | Graph querying and relationship traversal             |
-| Google Gemini         | AI-assisted investigation explanations                |
-| HTML, CSS, JavaScript | Web interface and client-side interactions            |
-| python-dotenv         | Loading local environment configuration               |
-
-Python dependencies are listed in [`requirements.txt`](requirements.txt).
+- **Backend:** Python, Flask
+- **Graph database:** FalkorDB
+- **Graph queries:** Cypher
+- **AI:** Google Gemini API
+- **Frontend:** HTML, CSS, JavaScript
 
 ## Architecture
 
-```text
-User
- |
- v
-AidTrace Web Interface
-(HTML, CSS, JavaScript)
- |
- v
-Flask Application
-(app.py)
- |
- +------------------------+
- |                        |
- v                        v
-FalkorDB              Gemini API
-Graph Database        AI Explanations
- |
- v
-Connected Relief Data
-Requests, Deliveries, Receipts,
-Routes, Incidents, Warehouses,
-and Supplies
- |
- v
-Investigation Results
-and Graph Evidence
-```
+1. Relief data is stored as connected nodes and relationships in FalkorDB.
+2. The Flask backend executes Cypher queries to retrieve and investigate graph evidence.
+3. The dashboard displays investigation findings, resource information, and graph relationships.
+4. Google Gemini assists in explaining investigation results using the available evidence.
 
-FalkorDB is responsible for storing and querying connected graph data. Flask coordinates requests and processes results. Gemini is used for AI-assisted analysis; the graph data and investigation logic provide the operational evidence.
+Deterministic graph queries handle the underlying data retrieval and investigation logic, while AI provides additional explanations.
 
 ## Graph Data Model
 
-AidTrace models relief operations as a graph. Nodes represent entities or records, and directed relationships represent connections between them.
+AidTrace represents relief-distribution information as a graph.
 
-### Node labels
+**Core entities**
+- Communities
+- Relief requests
+- Deliveries
+- Receipts
+- Routes
+- Incident reports
+- Warehouses
+- Supplies
 
-The current query modules reference the following labels:
+These entities are connected through relationships representing the flow of relief resources, fulfilment of requests, delivery confirmation, and related incidents.
 
-| Node label       | Purpose                                                     |
-| ---------------- | ----------------------------------------------------------- |
-| `Community`      | A community or destination associated with a relief request |
-| `ReliefRequest`  | A request for a relief item and quantity                    |
-| `Delivery`       | A delivery record                                           |
-| `Receipt`        | A receipt or confirmation record                            |
-| `Route`          | A route associated with a delivery                          |
-| `IncidentReport` | A report associated with a potentially affected route       |
-| `Warehouse`      | A warehouse holding supplies                                |
-| `Supply`         | A supply item and its recorded quantity                     |
-
-### Relationships
-
-| Relationship      | Meaning                                  |
-| ----------------- | ---------------------------------------- |
-| `HAS_REQUEST`     | Connects a community to a relief request |
-| `FULFILLED_BY`    | Connects a request to a delivery         |
-| `HAS_RECEIPT`     | Connects a delivery to a receipt         |
-| `TRANSPORTED_VIA` | Connects a delivery to a route           |
-| `AFFECTS`         | Connects an incident report to a route   |
-| `STORES`          | Connects a warehouse to a supply record  |
-
-### Important properties
-
-Depending on the node type, records can include properties such as:
-
-- `id` — record identifier
-- `name` — human-readable name
-- `item` — relief item
-- `quantity` — requested or recorded quantity
-- `reported_quantity` — quantity reported as delivered
-- `confirmed_quantity` — quantity confirmed by a receipt
-- `status` — recorded status
-- `description` — incident or record description
-- `scenario_id` — scenario identifier used to separate demonstration data
-
-Property availability varies by node type. Refer to the actual seed data and query implementation for the definitive schema.
+The graph structure allows AidTrace to investigate connected records instead of examining each record in isolation.
 
 ## Prerequisites
 
-Install the following before running the application:
+Install the following before running AidTrace:
 
-1. **Python 3.10 or later**, subject to the compatibility of the pinned or installed dependencies.
-2. **Git**, to clone the repository.
-3. **FalkorDB**, running locally or at a reachable database endpoint.
-4. **A Google Gemini API key**, for the AI investigation feature.
-
-FalkorDB must be available before you run database-dependent investigation or graph operations.
+- Python 3.10 or later
+- Git
+- Docker Desktop or Docker Engine
+- A Google Gemini API key for AI-assisted investigation
 
 ## Installation and Setup
 
@@ -152,221 +69,142 @@ git clone https://github.com/YADHUKISHANTR/AidTrace.git
 cd AidTrace
 ```
 
-### 2. Create a virtual environment
+### 2. Start FalkorDB
 
-**Windows PowerShell:**
+Run FalkorDB using Docker:
+
+```bash
+docker run -d \
+  --name aidtrace-db \
+  -p 6379:6379 \
+  -p 3000:3000 \
+  -v aidtrace_data:/var/lib/falkordb/data \
+  falkordb/falkordb:latest
+```
+
+If the container already exists, start it with:
+
+```bash
+docker start aidtrace-db
+```
+
+The application connects to FalkorDB at `localhost:6379` and uses the graph named `aidtrace`.
+
+FalkorDB's browser interface is available at:
+
+```text
+http://localhost:3000
+```
+
+### 3. Create a Python virtual environment
+
+**Windows PowerShell**
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-**Windows Command Prompt:**
+**Windows Command Prompt**
 
-```bat
+```cmd
 python -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
-**Linux or macOS:**
+**Linux or macOS**
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Python dependencies
+### 4. Install dependencies
 
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-If dependency installation fails, confirm that the Python version is compatible with the packages listed in `requirements.txt`.
+### 5. Configure the environment
 
-### 4. Start FalkorDB
+Create a file named `.env` in the project root:
 
-Start a FalkorDB instance using your chosen installation method. For a local setup, ensure the service is reachable at the host and port configured in the application.
-
-The current graph connection code uses the graph name `aidtrace` and a local connection at `localhost:6379`.
-
-If you use Docker, confirm the current FalkorDB image and startup instructions from the official documentation before running the container.
-
-- FalkorDB documentation: https://docs.falkordb.com/
-- FalkorDB repository: https://github.com/FalkorDB/FalkorDB
-
-If your database uses different host, port, or authentication settings, update the application configuration accordingly.
-
-## Configure Environment Variables
-
-Create a `.env` file in the project root for local secrets and configuration.
-
-Example:
-
-```dotenv
-GEMINI_API_KEY=your_gemini_api_key_here
+```env
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-Replace the placeholder with your own Gemini API key.
+Replace the example value with your own Google Gemini API key.
 
-**Security requirements:**
+Keep `.env` private and do not commit API keys to GitHub.
 
-- Never commit a real API key to GitHub.
-- Keep `.env` in `.gitignore`.
-- Do not paste API keys into screenshots, public issues, or the demo video.
-- Do not put secrets in source code or the README.
+### 6. Initialize the graph data
 
-If the application requires additional configuration, follow the environment-variable names used in the current source code.
-
-## Initialize the Graph Database
-
-AidTrace includes a graph seed script named `seed_graph.py`.
-
-After FalkorDB is running and your Python environment is active, inspect the script to confirm its supported options and run the appropriate initialization command.
+Run the project's data initialization script:
 
 ```bash
 python seed_graph.py
 ```
 
-**Important:** Confirm whether the script seeds both scenarios, whether it clears existing graph data, and whether it supports running repeatedly before executing it against any database containing data you need to preserve.
+This initializes the graph data used by the investigation system. Use the Wayanad and Assam scenarios provided by the project to explore different relief-investigation cases.
 
-The demonstration scenarios are:
-
-- **Wayanad** — relief-operation demonstration scenario in Kerala.
-- **Assam River Flooding** — a separate relief-operation demonstration scenario.
-
-If the seed script has separate commands for each scenario, document those exact commands here after verifying them in the source code.
-
-## Run AidTrace
-
-With the virtual environment active, dependencies installed, environment configured, and FalkorDB running, start Flask:
+### 7. Run the application
 
 ```bash
 python app.py
 ```
 
-Open the local URL printed in the terminal. If the development server uses the standard Flask default, this is usually:
+Open the local dashboard in your browser:
 
+```text
 http://127.0.0.1:5000/
+```
 
-If the application reports a connection error, check that FalkorDB is running, the configured host and port are correct, and the expected graph has been initialized.
+Keep the FalkorDB container running while using the application.
 
-The Flask development server is intended for local demonstration and development, not production deployment.
+## Using AidTrace
 
-## Using the Application
-
-1. Open AidTrace in your browser.
+1. Open the dashboard.
 2. Select the Wayanad or Assam scenario.
-3. Run the investigation.
-4. Review the findings, resource-matching results, and recommended actions.
-5. Update a route's status if the scenario and interface provide an appropriate update control.
-6. Run the AI investigation to inspect the explanation generated for the selected case.
-7. Open the graph visualization to examine nodes and their relationships.
-8. Inspect or update supported node properties when appropriate, providing a truthful reason for any change.
+3. Run an investigation to examine the connected relief records.
+4. Review discrepancies, evidence, resource information, and investigation findings.
+5. Explore the graph to inspect relationships between records.
+6. Use supported route and node updates to record justified changes.
+7. Run the AI-assisted investigation to obtain an additional explanation of the available evidence.
 
-After changing graph data, rerun the relevant investigation to check whether the displayed results reflect the updated records.
-
-## Cypher Queries and Graph Algorithms
-
-The primary query documentation is maintained separately:
-
-**[Cypher Queries and Graph Algorithms](docs/CYPHER_QUERIES.md)**
-
-That document describes the graph traversal patterns, quantity comparisons, evidence retrieval, scenario filtering, and graph explorer queries.
-
-The principal implementation files include:
-
-- `investigate.py`
-- `trace_evidence.py`
-- `graph_explorer.py`
-- `investigation.py`
-- `app.py`
-
-The queries in the source code are the source of truth. Keep the documentation synchronized with the implementation.
+The scenarios use sample data for demonstration. Investigation findings indicate potential discrepancies that require verification; they do not, by themselves, establish fraud or wrongdoing.
 
 ## Project Structure
 
 ```text
 AidTrace/
-├── app.py
-├── ai_investigator.py
-├── add_evidence.py
-├── check_cross_centre.py
-├── graph_explorer.py
-├── investigate.py
-├── investigation.py
-├── investigation_report.py
-├── rename_location.py
-├── seed_graph.py
-├── trace_evidence.py
-├── requirements.txt
-├── README.md
-├── docs/
-│   └── CYPHER_QUERIES.md
-├── static/
-├── templates/
-└── tests/
+├── static/                  # Frontend assets
+├── templates/               # Flask HTML templates
+├── tests/                   # Tests
+├── app.py                   # Flask application
+├── seed_graph.py             # Graph data initialization
+├── investigate.py            # Investigation logic
+├── investigation.py          # Investigation functionality
+├── investigation_report.py   # Investigation reporting
+├── ai_investigator.py        # Gemini-assisted investigation
+├── trace_evidence.py         # Evidence tracing
+├── graph_explorer.py         # Graph exploration
+├── check_cross_centre.py     # Cross-centre checks
+├── add_evidence.py           # Evidence utilities
+├── rename_location.py        # Location utilities
+└── requirements.txt          # Python dependencies
 ```
 
-This is a high-level view. The repository may contain additional configuration and supporting files.
+## Graph Queries
 
-## Testing
+AidTrace uses Cypher queries to retrieve connected records and support its graph-based investigation workflow. These queries allow the application to trace relationships and examine potential inconsistencies across relief-distribution data.
 
-The repository includes a `tests/` directory.
+## AI Disclosure
 
-Inspect the available tests and run the appropriate test command for the current test framework. If the project uses pytest, run:
+AI tools, including Google Gemini and ChatGPT, were used to assist with development, debugging, and documentation. AI-assisted contributions were reviewed by the project author.
 
-```bash
-python -m pytest
-```
+## Track
 
-Before submitting, test both scenarios and verify:
+**FalkorDB Graph Hacks — Track 01: Agents That Act on Connected Data**
 
-- Investigation results load successfully.
-- Wayanad data does not leak into Assam results, or vice versa.
-- Quantity calculations agree with the underlying records.
-- Missing delivery or receipt evidence is handled appropriately.
-- Resource matching does not double-count stock.
-- Route updates persist as expected.
-- Node edits are validated and audited.
-- AI explanations agree with the structured investigation evidence.
-
-Do not describe a test as passing unless you have actually run it.
-
-## Demo Video
-
-**Demo video:** [Add your published demo video URL here]
-
-The walkthrough should demonstrate the working website, the investigation workflow, a route update, AI-assisted analysis, and inspection of the underlying graph evidence.
-
-Replace the placeholder above with the final public video link before submission.
-
-## Hackathon Track
-
-**Event:** FalkorDB Graph Hacks — WeMakeDevs
-
-**Track:** Track 01 — Agents That Act on Connected Data
-
-AidTrace explores how graph queries can support investigation by traversing connected relief-operation records, retrieving relevant evidence, and helping users understand potential discrepancies and resource gaps.
-
-Official event page: https://www.wemakedevs.org/hackathons/falkordb
-
-## AI-Assisted Development Disclosure
-
-AI coding assistants were used during development for assistance with code review, debugging, documentation, and implementation guidance. The project author is responsible for reviewing, testing, and understanding the submitted code.
-
-Before submission, update this section to identify the actual tools used and accurately describe the assistance they provided. Do not claim that all code was written independently if AI-generated code was incorporated into the project.
-
-## Limitations
-
-AidTrace is a hackathon prototype and its findings depend on the quality, completeness, and consistency of the underlying records.
-
-- A discrepancy indicates a difference between records; it does not establish wrongdoing.
-- Missing relationships can prevent some records from appearing in a query result.
-- Resource matching requires careful validation of available stock, allocations, and delivery feasibility.
-- AI explanations may be incomplete or incorrect and should be checked against graph evidence.
-- Scenario isolation, aggregation, and persistence must be tested before the results are used for operational decisions.
-
-## License
-
-Add the license and attribution information applicable to this repository and its data before public release.
+AidTrace applies graph-based investigation to disaster-relief distribution, using connected evidence to identify potential discrepancies and support explainable investigation workflows.
