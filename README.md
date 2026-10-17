@@ -138,15 +138,27 @@ Replace the example value with your own Google Gemini API key.
 
 Keep `.env` private and do not commit API keys to GitHub.
 
-### 6. Initialize the graph data
+### 6. Initialize the Graph Data
 
-Run the project's data initialization script:
+AidTrace uses `seed_graph.py` to populate FalkorDB with sample disaster-relief data for the Wayanad and Assam scenarios. The script creates the graph nodes and relationships used by the investigation system.
+
+Make sure FalkorDB is running before executing:
 
 ```bash
 python seed_graph.py
 ```
 
-This initializes the graph data used by the investigation system. Use the Wayanad and Assam scenarios provided by the project to explore different relief-investigation cases.
+Run this command when setting up the sample data for the first time. You do not need to run it every time you start the website if the data is already present.
+
+### 7. Run the Application
+
+Start the Flask application:
+
+```bash
+python app.py
+```
+
+Open `http://127.0.0.1:5000/` in your browser and select a scenario to explore its relief data and investigation results.
 
 ### 7. Run the application
 
