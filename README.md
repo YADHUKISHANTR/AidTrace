@@ -79,7 +79,7 @@ flowchart TD
 
 The screenshot below shows an example of the graph explorer displaying the Wayanad demonstration scenario. It illustrates the records and connections visible in the website, including an audit log showing a relief-request quantity change from 120 to 140.
 
-![AidTrace graph explorer showing the Wayanad demonstration scenario](docs/images/wayanad-graph.png)
+![AidTrace graph explorer showing the Wayanad demonstration scenario](docs/wayanad-graph.png)
 
 
 ### How the graph supports investigations
