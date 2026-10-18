@@ -284,6 +284,10 @@ AidTrace/
 
 ChatGPT was used to assist with project development, debugging, and documentation. Google Gemini is integrated into AidTrace to provide AI-assisted explanations of investigation findings. The project author reviewed the AI-assisted development contributions.
 
+All AI tools used were accessed through their free tiers. 
+
+No paid AI subscriptions, premium plans, or paid AI API usage were used during development. The project implementation, integration, testing, and final decisions were carried out and reviewed by me.
+
 ## Track
 
 **FalkorDB Graph Hacks — Track 01: Agents That Act on Connected Data**
