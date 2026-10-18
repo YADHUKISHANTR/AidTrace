@@ -45,7 +45,7 @@ Deterministic graph queries handle underlying data retrieval and investigation l
 
 ## Graph Data Model
 
-AidTrace represents relief-distribution information as a graph, connecting related records so investigations can trace relief requests, deliveries, receipt evidence, routes, incidents, warehouses, and supplies.
+AidTrace represents relief-distribution information as a graph, connecting related records so investigations can trace relief requests, deliveries, receipt evidence, routes, incidents, warehouses, and supplies. The records and connections present can vary by scenario and by application operations.
 
 ### Core node categories
 
@@ -56,15 +56,14 @@ AidTrace represents relief-distribution information as a graph, connecting relat
 | `Delivery` | Represents delivery records, including reported quantities and delivery status. |
 | `Receipt` | Records receipt evidence, including confirmed quantities and confirmation status. |
 | `Route` | Represents delivery routes and their associated status. |
-| `IncidentReport` | Represents reported incidents that may affect a route and require further investigation. |
+| `Incident` / `IncidentReport` | Represents reported incidents relevant to an investigation. The seed script assigns both labels to the Wayanad incident record. |
 | `Warehouse` | Represents relief-resource storage and distribution locations. |
 | `Supply` | Records relief resources and their quantities associated with a warehouse. |
+| `AuditLog` | Represents an audit record displayed in the graph explorer when a supported change is recorded. |
 
-The incident record is created with both `Incident` and `IncidentReport` labels in the seed script.
+### Graph relationship overview
 
-### Graph relationships
-
-The following diagram shows the node connections and relationship types explicitly created by the graph initialization script.
+The diagram below shows the primary relationships explicitly created by `seed_graph.py`. It is a general overview of the seeded graph structure, not a promise that every scenario contains every node or connection.
 
 ```mermaid
 flowchart TD
@@ -72,21 +71,28 @@ flowchart TD
     R -->|FULFILLED_BY| D["Delivery"]
     D -->|HAS_RECEIPT| REC["Receipt"]
     D -->|TRANSPORTED_VIA| RT["Route"]
-    I["IncidentReport"] -->|AFFECTS| RT
+    I["Incident / IncidentReport"] -->|AFFECTS| RT
     W["Warehouse"] -->|STORES| S["Supply"]
 ```
+
+### Example: Wayanad scenario graph
+
+The screenshot below shows an example of the graph explorer displaying the Wayanad demonstration scenario. It illustrates the records and connections visible in the website, including an audit log showing a relief-request quantity change from 120 to 140.
+
+![AidTrace graph explorer showing the Wayanad demonstration scenario](docs/images/wayanad-graph.png)
+
 
 ### How the graph supports investigations
 
 AidTrace connects relief requests to delivery records and receipt evidence, allowing the application to compare reported quantities with confirmed quantities. For example, the synthetic Wayanad demonstration records 120 water kits as reported delivered and 70 as confirmed by receipt evidence, leaving a discrepancy of 50 kits that requires further verification.
 
-The graph also connects delivery records to routes and incident reports, while warehouses are connected to their supplies. These relationships allow related records to be retrieved together instead of being treated as isolated entries.
+The graph also connects delivery records to routes and incident reports, while warehouses are connected to their supplies. These relationships allow related records to be retrieved together instead of being treated as isolated entries. The graph explorer may display additional application records, such as audit logs.
 
-The Wayanad and Assam scenarios contain synthetic demonstration data. A discrepancy or unverified incident is an investigation lead, not proof of fraud. The diagram represents relationships created by the seed script; additional queries or application code may use other graph operations.
+The Wayanad and Assam scenarios contain synthetic demonstration data. A discrepancy or unverified incident is an investigation lead, not proof of fraud. The diagram documents the primary relationships created by the seed script; additional queries or application operations may use other graph operations.
 
 ### Why a graph database?
 
-A relief-distribution discrepancy may involve several connected records. For example, a delivery record may be associated with a relief request, a route, a warehouse, a supply record, and a receipt.
+A relief-distribution discrepancy may involve several connected records. For example, a delivery record may be associated with a relief request, a route, and a receipt. Other available records, such as warehouse supplies or incident reports, can provide additional context when connected in the graph.
 
 Investigating these connections allows AidTrace to examine the surrounding evidence rather than relying on an isolated quantity or record. It can help investigators identify inconsistencies, trace related records, and determine which findings need further verification.
 
