@@ -45,39 +45,44 @@ Deterministic graph queries handle underlying data retrieval and investigation l
 
 ## Graph Data Model
 
-AidTrace represents relief-distribution information as a graph rather than treating every record as an isolated entry.
+AidTrace represents relief-distribution information as a graph, connecting related records so investigations can trace relief requests, deliveries, receipt evidence, routes, incidents, warehouses, and supplies.
 
 ### Core node categories
 
-| Node category | Purpose |
+| Node label | Purpose |
 |---|---|
-| Communities | Represent communities affected by a disaster |
-| Relief requests | Represent requests for relief resources |
-| Deliveries | Represent records of resource distribution |
-| Receipts | Represent delivery acknowledgements or receipt records |
-| Routes | Represent delivery routes and associated information |
-| Incident reports | Represent reported incidents relevant to an investigation |
-| Warehouses | Represent resource storage and distribution locations |
-| Supplies | Represent relief resources and their quantities |
+| `Community` | Represents communities affected by a disaster or relief-distribution centres. |
+| `ReliefRequest` | Records requested relief resources, quantities, and request status. |
+| `Delivery` | Represents delivery records, including reported quantities and delivery status. |
+| `Receipt` | Records receipt evidence, including confirmed quantities and confirmation status. |
+| `Route` | Represents delivery routes and their associated status. |
+| `IncidentReport` | Represents reported incidents that may affect a route and require further investigation. |
+| `Warehouse` | Represents relief-resource storage and distribution locations. |
+| `Supply` | Records relief resources and their quantities associated with a warehouse. |
 
-### Graph relationship overview
+The incident record is created with both `Incident` and `IncidentReport` labels in the seed script.
 
-The following conceptual diagram illustrates how these categories can be connected in a relief investigation. The labels describe the meaning of the connections; they are not necessarily the literal relationship type names stored in FalkorDB.
+### Graph relationships
+
+The following diagram shows the node connections and relationship types explicitly created by the graph initialization script.
 
 ```mermaid
 flowchart TD
-    C[Communities] -->|Submit or have| R[Relief Requests]
-    R -->|Fulfilled through| D[Deliveries]
-    D -->|Associated with| RT[Routes]
-    D -->|Recorded at| W[Warehouses]
-    D -->|Contains or distributes| S[Supplies]
-    D -->|Supported by| RC[Receipts]
-    I[Incident Reports] -->|Related to| D
-    I -->|May involve| RT
-    W -->|Stores or manages| S
+    C["Community"] -->|HAS_REQUEST| R["ReliefRequest"]
+    R -->|FULFILLED_BY| D["Delivery"]
+    D -->|HAS_RECEIPT| REC["Receipt"]
+    D -->|TRANSPORTED_VIA| RT["Route"]
+    I["IncidentReport"] -->|AFFECTS| RT
+    W["Warehouse"] -->|STORES| S["Supply"]
 ```
 
-The actual nodes, relationship types, and directions used by AidTrace are defined by its graph initialization and investigation code.
+### How the graph supports investigations
+
+AidTrace connects relief requests to delivery records and receipt evidence, allowing the application to compare reported quantities with confirmed quantities. For example, the synthetic Wayanad demonstration records 120 water kits as reported delivered and 70 as confirmed by receipt evidence, leaving a discrepancy of 50 kits that requires further verification.
+
+The graph also connects delivery records to routes and incident reports, while warehouses are connected to their supplies. These relationships allow related records to be retrieved together instead of being treated as isolated entries.
+
+The Wayanad and Assam scenarios contain synthetic demonstration data. A discrepancy or unverified incident is an investigation lead, not proof of fraud. The diagram represents relationships created by the seed script; additional queries or application code may use other graph operations.
 
 ### Why a graph database?
 
