@@ -22,7 +22,6 @@ Watch me explain the project, its motivation, graph-based investigation approach
 
 **[▶ Watch the AidTrace Project Explanation on YouTube](https://youtu.be/Er1qoUYxt-c)**
 
-
 ## Technology Stack
 
 - **Backend:** Python, Flask
@@ -49,17 +48,17 @@ AidTrace represents relief-distribution information as a graph, connecting relat
 
 ### Core node categories
 
-| Node label | Purpose |
-|---|---|
-| `Community` | Represents communities affected by a disaster or relief-distribution centres. |
-| `ReliefRequest` | Records requested relief resources, quantities, and request status. |
-| `Delivery` | Represents delivery records, including reported quantities and delivery status. |
-| `Receipt` | Records receipt evidence, including confirmed quantities and confirmation status. |
-| `Route` | Represents delivery routes and their associated status. |
+| Node label                    | Purpose                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Community`                   | Represents communities affected by a disaster or relief-distribution centres.                                                   |
+| `ReliefRequest`               | Records requested relief resources, quantities, and request status.                                                             |
+| `Delivery`                    | Represents delivery records, including reported quantities and delivery status.                                                 |
+| `Receipt`                     | Records receipt evidence, including confirmed quantities and confirmation status.                                               |
+| `Route`                       | Represents delivery routes and their associated status.                                                                         |
 | `Incident` / `IncidentReport` | Represents reported incidents relevant to an investigation. The seed script assigns both labels to the Wayanad incident record. |
-| `Warehouse` | Represents relief-resource storage and distribution locations. |
-| `Supply` | Records relief resources and their quantities associated with a warehouse. |
-| `AuditLog` | Represents an audit record displayed in the graph explorer when a supported change is recorded. |
+| `Warehouse`                   | Represents relief-resource storage and distribution locations.                                                                  |
+| `Supply`                      | Records relief resources and their quantities associated with a warehouse.                                                      |
+| `AuditLog`                    | Represents an audit record displayed in the graph explorer when a supported change is recorded.                                 |
 
 ### Graph relationship overview
 
@@ -75,12 +74,13 @@ flowchart TD
     W["Warehouse"] -->|STORES| S["Supply"]
 ```
 
-### Example: Wayanad scenario graph
+### Example: Wayanad Scenario Graph
 
-The screenshot below shows an example of the graph explorer displaying the Wayanad demonstration scenario. It illustrates the records and connections visible in the website, including an audit log showing a relief-request quantity change from 120 to 140.
+The screenshot below shows AidTrace's graph explorer displaying the Wayanad demonstration scenario. It illustrates connected communities, relief requests, deliveries, receipts, routes, incident reports, warehouses, and supplies. Selecting a node reveals its stored properties, allowing users to inspect records and trace related evidence across the graph.
+
+The displayed records are synthetic demonstration data used to illustrate how AidTrace connects relief-distribution information for investigation.
 
 ![AidTrace graph explorer showing the Wayanad demonstration scenario](docs/wayanad-graph.png)
-
 
 ### How the graph supports investigations
 
