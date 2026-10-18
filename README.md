@@ -16,6 +16,13 @@ Built with **Python, Flask, FalkorDB, Cypher, and Google Gemini**, AidTrace conn
 - **AI-assisted investigation:** Use Google Gemini to explain findings based on investigation evidence.
 - **Multiple scenarios:** Explore the Wayanad and Assam flood-relief scenarios.
 
+## Project Demo Video
+
+Watch me explain the project, its motivation, graph-based investigation approach, and demonstration workflow.
+
+**[▶ Watch the AidTrace Project Explanation on YouTube](https://youtu.be/Er1qoUYxt-c)**
+
+
 ## Technology Stack
 
 - **Backend:** Python, Flask
@@ -26,30 +33,95 @@ Built with **Python, Flask, FalkorDB, Cypher, and Google Gemini**, AidTrace conn
 
 ## Architecture
 
-1. Relief data is stored as connected nodes and relationships in FalkorDB.
-2. The Flask backend executes Cypher queries to retrieve and investigate graph evidence.
-3. The dashboard displays investigation findings, resource information, and graph relationships.
-4. Google Gemini assists in explaining investigation results using the available evidence.
+AidTrace combines graph-based data retrieval and investigation logic with AI-assisted explanations.
 
-Deterministic graph queries handle the underlying data retrieval and investigation logic, while AI provides additional explanations.
+1. **Graph storage:** Relief-distribution records are stored as connected nodes and relationships in FalkorDB.
+2. **Graph investigation:** The Flask backend executes Cypher queries to retrieve connected records, trace evidence, and examine potential discrepancies.
+3. **Evidence analysis:** Investigation logic processes the retrieved graph data to identify relevant discrepancies and relationships.
+4. **Dashboard:** The application presents investigation findings, resource information, and graph relationships.
+5. **AI-assisted explanation:** Google Gemini receives investigation evidence to help explain findings and distinguish potential discrepancies from confirmed facts.
+
+Deterministic graph queries handle underlying data retrieval and investigation logic, while AI provides additional explanations. AI-generated explanations should be interpreted in the context of the available evidence.
 
 ## Graph Data Model
 
-AidTrace represents relief-distribution information as a graph.
+AidTrace represents relief-distribution information as a graph rather than treating every record as an isolated entry.
 
-**Core entities**
-- Communities
-- Relief requests
-- Deliveries
-- Receipts
-- Routes
-- Incident reports
-- Warehouses
-- Supplies
+### Core node categories
 
-These entities are connected through relationships representing the flow of relief resources, fulfilment of requests, delivery confirmation, and related incidents.
+| Node category | Purpose |
+|---|---|
+| Communities | Represent communities affected by a disaster |
+| Relief requests | Represent requests for relief resources |
+| Deliveries | Represent records of resource distribution |
+| Receipts | Represent delivery acknowledgements or receipt records |
+| Routes | Represent delivery routes and associated information |
+| Incident reports | Represent reported incidents relevant to an investigation |
+| Warehouses | Represent resource storage and distribution locations |
+| Supplies | Represent relief resources and their quantities |
 
-The graph structure allows AidTrace to investigate connected records instead of examining each record in isolation.
+### Graph relationship overview
+
+The following conceptual diagram illustrates how these categories can be connected in a relief investigation. The labels describe the meaning of the connections; they are not necessarily the literal relationship type names stored in FalkorDB.
+
+```mermaid
+flowchart TD
+    C[Communities] -->|Submit or have| R[Relief Requests]
+    R -->|Fulfilled through| D[Deliveries]
+    D -->|Associated with| RT[Routes]
+    D -->|Recorded at| W[Warehouses]
+    D -->|Contains or distributes| S[Supplies]
+    D -->|Supported by| RC[Receipts]
+    I[Incident Reports] -->|Related to| D
+    I -->|May involve| RT
+    W -->|Stores or manages| S
+```
+
+The actual nodes, relationship types, and directions used by AidTrace are defined by its graph initialization and investigation code.
+
+### Why a graph database?
+
+A relief-distribution discrepancy may involve several connected records. For example, a delivery record may be associated with a relief request, a route, a warehouse, a supply record, and a receipt.
+
+Investigating these connections allows AidTrace to examine the surrounding evidence rather than relying on an isolated quantity or record. It can help investigators identify inconsistencies, trace related records, and determine which findings need further verification.
+
+## How FalkorDB Powers Investigations
+
+FalkorDB is a core component of AidTrace's investigation workflow, not simply a storage layer.
+
+The application uses Cypher queries to retrieve connected records and investigate relationships in the `aidtrace` graph.
+
+The workflow is:
+
+1. Select a demonstration scenario, such as Wayanad or Assam.
+2. Query FalkorDB for relevant relief records and their connections.
+3. Examine the retrieved evidence for potential discrepancies and related records.
+4. Present investigation findings through the dashboard and graph explorer.
+5. Pass the available investigation evidence to Google Gemini for an additional explanation when AI-assisted investigation is requested.
+
+This separation allows graph queries to retrieve the underlying records while the AI layer helps communicate what the available evidence may indicate.
+
+### Example investigation scenario
+
+In the Wayanad demonstration, 120 water kits are reported as delivered, while records account for only 70 kits.
+
+The resulting difference is:
+
+**Reported quantity − Accounted quantity = Potential discrepancy**
+
+**120 − 70 = 50 kits**
+
+AidTrace uses this scenario to demonstrate how an investigator can examine the reported quantities and trace related records to understand the discrepancy.
+
+The difference alone does not establish that supplies were stolen or diverted. The underlying delivery records, receipts, and other available evidence must be examined before drawing conclusions.
+
+### Cypher queries and investigation logic
+
+AidTrace uses Cypher to retrieve and examine graph records. Its investigation and graph-exploration modules query FalkorDB to support evidence tracing, cross-centre checks, resource matching, and graph visualization.
+
+For implementation details and the project's Cypher queries, see [Cypher Queries and Graph Algorithms](docs/CYPHER_QUERIES.md).
+
+The graph schema and query examples in the documentation should be read alongside the actual implementation in `seed_graph.py`, `investigation.py`, `investigate.py`, and `graph_explorer.py`.
 
 ## Prerequisites
 
@@ -138,7 +210,7 @@ Replace the example value with your own Google Gemini API key.
 
 Keep `.env` private and do not commit API keys to GitHub.
 
-### 6. Initialize the Graph Data
+### 6. Initialize the graph data
 
 AidTrace uses `seed_graph.py` to populate FalkorDB with sample disaster-relief data for the Wayanad and Assam scenarios. The script creates the graph nodes and relationships used by the investigation system.
 
@@ -149,8 +221,6 @@ python seed_graph.py
 ```
 
 Run this command when setting up the sample data for the first time. You do not need to run it every time you start the website if the data is already present.
-
-
 
 ### 7. Run the application
 
@@ -199,15 +269,9 @@ AidTrace/
 └── requirements.txt          # Python dependencies
 ```
 
-Graph Queries
-
-AidTrace uses Cypher queries to investigate connected relief-distribution records, trace evidence, identify potential discrepancies, and support resource matching through FalkorDB.
-
-For details about the graph data model, Cypher queries, and investigation logic, see [Cypher Queries and Graph Algorithms](docs/CYPHER_QUERIES.md).
-
 ## AI Disclosure
 
-AI tools, including Google Gemini and ChatGPT, were used to assist with development, debugging, and documentation. AI-assisted contributions were reviewed by the project author.
+ChatGPT was used to assist with project development, debugging, and documentation. Google Gemini is integrated into AidTrace to provide AI-assisted explanations of investigation findings. The project author reviewed the AI-assisted development contributions.
 
 ## Track
 
